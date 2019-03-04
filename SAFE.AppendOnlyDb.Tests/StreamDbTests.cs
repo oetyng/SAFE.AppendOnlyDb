@@ -8,7 +8,7 @@ using SAFE.Data;
 namespace SAFE.AppendOnlyDb.Tests
 {
     [TestClass]
-    public class DatabaseTests : TestBase
+    public class StreamDbTests : TestBase
     {
         [TestInitialize]
         public async Task TestInitialize()

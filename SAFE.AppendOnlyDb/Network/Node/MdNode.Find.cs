@@ -8,7 +8,20 @@ namespace SAFE.AppendOnlyDb.Network
 {
     internal sealed partial class MdNode
     {
-        public bool Contains(ulong version) => NextVersion > version && version >= StartIndex;
+        public bool Contains(ulong version)
+        {
+            // can Count be 0 at this point?
+            switch(Type)
+            {
+                case MdType.Values:
+                    return NextVersion > version && version >= StartIndex;
+                case MdType.Pointers:
+                    var maxVersionHeld = (Count * Math.Pow(Constants.MdCapacity, Level)) - 1; // the node with this EndIndex exists, but we don't know at what version it is
+                    return version >= StartIndex && maxVersionHeld > version;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(Type));
+            }
+        }
 
         bool ExistsInNext(ulong version) => version > EndIndex && IsFull;
         bool ExistsInPrevious(ulong version) => StartIndex > version;
@@ -62,7 +75,7 @@ namespace SAFE.AppendOnlyDb.Network
                 case MdType.Values:
                     return await _dataOps.GetEntriesAsync<ulong, StoredValue>(
                         k => ulong.Parse(k),
-                        k => k >= min && max >= k);
+                        k => k >= min && max >= k); // VERY SLOW WHEN DEBUGGING
                 case MdType.Pointers:
                     var indexMin = (ulong)Math.Truncate(min / Math.Pow(Constants.MdCapacity, Level));
                     var indexMax = (ulong)Math.Truncate(max / Math.Pow(Constants.MdCapacity, Level));
@@ -77,10 +90,25 @@ namespace SAFE.AppendOnlyDb.Network
                         .Select(c => c.Value)
                         .Where(c => !(c.Version is NoVersion)) // might be unnecesary safety measure
                         .Select(c => c.FindRangeAsync(
-                            Math.Max(indexMin, c.StartIndex), 
-                            Math.Min(indexMax, (ulong)c.Version.Value)));
+                            Math.Max(indexMin, c.StartIndex),
+                            Math.Max(indexMax, (ulong)c.Version.Value)));
                     var all = await Task.WhenAll(concurrent);
                     return all.SelectMany(c => c);
+
+                    //var concurrent = targets
+                    //    .Where(c => c.HasValue)
+                    //    .Select(c => c.Value)
+                    //    .Where(c => !(c.Version is NoVersion))
+                    //    .ToList();
+                    //var all = new List<(ulong, StoredValue)>();
+                    //foreach (var c in concurrent)
+                    //{
+                    //    var range = (await c.FindRangeAsync(
+                    //        Math.Max(indexMin, c.StartIndex),
+                    //        Math.Max(indexMax, (ulong)c.Version.Value))).ToList();
+                    //    all.AddRange(range);
+                    //}
+                    //return all;
                 default:
                     return new List<(ulong, StoredValue)>();
             }

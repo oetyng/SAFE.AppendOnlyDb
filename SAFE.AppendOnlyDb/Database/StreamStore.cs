@@ -26,7 +26,7 @@ namespace SAFE.AppendOnlyDb
                 StreamName = type,
                 MdLocator = location
             };
-            await _collection.Add(stream).ConfigureAwait(false);
+            await _collection.AddAsync(stream).ConfigureAwait(false);
         }
 
         public async Task<IEnumerable<(string, MdLocator)>> GetAllAsync()
@@ -46,7 +46,7 @@ namespace SAFE.AppendOnlyDb
                 else
                     updated.Add(item);
             }
-            await _collection.Replace(updated);
+            await _collection.SetAsync(updated);
         }
     }
 }

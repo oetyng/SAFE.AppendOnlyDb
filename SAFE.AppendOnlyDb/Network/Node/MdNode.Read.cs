@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using SAFE.AppendOnlyDb.Utils;
 using SAFE.Data;
-using SafeApp;
 using SafeApp.Utilities;
 
 namespace SAFE.AppendOnlyDb.Network
@@ -65,81 +64,53 @@ namespace SAFE.AppendOnlyDb.Network
             }
         }
 
-        public async Task<IEnumerable<StoredValue>> GetAllValuesAsync()
+        public async IAsyncEnumerable<StoredValue> GetAllValuesAsync()
         {
-            try
+            switch (Type)
             {
-                switch (Type)
-                {
-                    case MdType.Values:
-                        var values = await _dataOps.GetEntriesAsync<ulong, StoredValue>(c => ulong.Parse(c));
-                        return values.Select(c => c.Item2);
-                    case MdType.Pointers:
-                        var pointers = await _dataOps.GetEntriesAsync<ulong, Pointer>(c => ulong.Parse(c));
-                        var pointerTasks = pointers // from pointers get regs to mds
-                            .Select(c => c.Item2)
-                            .Select(c => LocateAsync(c.MdLocator, _dataOps.Session));
-                        var pointerValues = await Task.WhenAll(pointerTasks).ConfigureAwait(false);
-                        var valueTasks = pointerValues
-                           .Select(c => c.Value.GetAllValuesAsync());
-                        var fetchedValues = (await Task.WhenAll(valueTasks).ConfigureAwait(false))
-                            .SelectMany(c => c);
-                        var valueBag = new ConcurrentBag<StoredValue>();
-                        Parallel.ForEach(fetchedValues, val => valueBag.Add(val));
-                        return valueBag;
-                    default:
-                        throw new ArgumentOutOfRangeException(nameof(Type));
-                }
-            }
-            catch
-            {
-                // (FfiException ex)
-                // if (ex.ErrorCode != -106) // does not make sense to check for key not found error here
-                //    throw;
-                throw;
+                case MdType.Values:
+                    var values = _dataOps.GetEntriesAsync<ulong, StoredValue>(c => ulong.Parse(c));
+                    await foreach (var item in values.Select(c => c.Item2))
+                        yield return item;
+                    break;
+                case MdType.Pointers:
+                    var pointerValues = LocateMany(_dataOps.GetEntriesAsync<ulong, Pointer>(c => ulong.Parse(c))
+                        .Select(c => c.Item2.MdLocator))
+                        .SelectMany(c => c.Value.GetAllValuesAsync());
+                    await foreach (var item in pointerValues)
+                        yield return item;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(Type));
             }
         }
 
-        public async Task<IEnumerable<(Pointer, StoredValue)>> GetAllPointerValuesAsync()
+        public async IAsyncEnumerable<(Pointer, StoredValue)> GetAllPointerValuesAsync()
         {
             switch (Type)
             {
                 case MdType.Pointers:
-                    var pointerTasks = (await GetAllPointersAsync().ConfigureAwait(false))
-                        .Select(c => LocateAsync(c.MdLocator, _dataOps.Session));
-                    var pointerValuesTasks = (await Task.WhenAll(pointerTasks).ConfigureAwait(false))
-                        .Select(c => c.Value.GetAllPointerValuesAsync());
-                    return (await Task.WhenAll(pointerValuesTasks).ConfigureAwait(false))
-                        .SelectMany(c => c);
+                    var pointers = LocateMany(GetAllPointersAsync().Select(c => c.MdLocator));
+                    var allPointers = pointers.SelectMany(c => c.Value.GetAllPointerValuesAsync()).ConfigureAwait(false);
+                    await foreach (var item in allPointers)
+                        yield return item;
+                    break;
                 case MdType.Values:
-
-                    // return (await GetAllValuesAsync())
-                    //    .Where(c => c.ValueType != typeof(MdMetadata).Name)
-                    //    .Select(c => (new Pointer
-                    //    {
-                    //        XORAddress = this.XORAddress,
-                    //        MdKey = c.Key, // We do not have the key here, unfortunately..
-                    //        ValueType = c.ValueType
-                    //    }, c));
-
                     var keys = EnumerableExt.LongRange(StartIndex, (ulong)Count);
                     var pairs = new ConcurrentDictionary<ulong, StoredValue>();
-                    var valueTasks = keys.Select(async c =>
+                    foreach (var key in keys)
                     {
-                        var val = await GetValueAsync(c).ConfigureAwait(false);
-                        if (val.HasValue)
-                            pairs[c] = val.Value;
-                    });
-                    await Task.WhenAll(valueTasks).ConfigureAwait(false);
-
-                    return pairs
-                        .Where(c => c.Value.ValueType != typeof(MdMetadata).Name)
-                        .Select(c => (new Pointer
+                        var val = await GetValueAsync(key).ConfigureAwait(false);
+                        if (!val.HasValue)
+                            continue;
+                        yield return (new Pointer
                         {
                             MdLocator = MdLocator,
-                            MdKey = $"{c.Key}",
-                            ValueType = c.Value.ValueType
-                        }, c.Value));
+                            MdKey = $"{key}",
+                            ValueType = val.Value.ValueType
+                        }, val.Value);
+                    }
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(Type));
             }
@@ -228,26 +199,19 @@ namespace SAFE.AppendOnlyDb.Network
         }
 
         // Added for conversion
-        async Task<IEnumerable<Pointer>> GetAllPointersAsync()
+        async IAsyncEnumerable<Pointer> GetAllPointersAsync()
         {
-            try
+            switch (Type)
             {
-                switch (Type)
-                {
-                    case MdType.Pointers:
-                        return await _dataOps.GetValuesAsync<Pointer>().ConfigureAwait(false);
-                    case MdType.Values:
-                        throw new InvalidOperationException("Pointers can only be fetched in Pointer type Mds (i.e. Level > 0).");
-                    default:
-                        throw new ArgumentOutOfRangeException(nameof(Type));
-                }
-            }
-            catch
-            {
-                // (FfiException ex)
-                // if (ex.ErrorCode != -106) // does not make sense to check for key not found error here
-                //    throw;
-                throw;
+                case MdType.Pointers:
+                    var pointers = _dataOps.GetValuesAsync<Pointer>().ConfigureAwait(false);
+                    await foreach (var pointer in pointers)
+                        yield return pointer;
+                    break;
+                case MdType.Values:
+                    throw new InvalidOperationException("Pointers can only be fetched in Pointer type Mds (i.e. Level > 0).");
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(Type));
             }
         }
     }

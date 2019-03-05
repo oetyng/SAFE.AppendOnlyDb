@@ -7,7 +7,7 @@ namespace SAFE.AppendOnlyDb
     public interface IStreamDb
     {
         Task<Result<Pointer>> AppendAsync(string streamKey, object data);
-        Task<IEnumerable<T>> GetStream<T>(string streamKey);
-        Task<Result<T>> GetVersionAsync<T>(string streamKey, ulong version);
+        IAsyncEnumerable<T> GetStreamAsync<T>(string streamKey);
+        Task<Result<T>> GetAtVersionAsync<T>(string streamKey, ulong version);
     }
 }

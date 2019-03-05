@@ -17,7 +17,7 @@ namespace SAFE.AppendOnlyDb.Tests
         }
 
         [TestMethod]
-        public async Task DatabaseTests_getoradd_returns_database()
+        public async Task Db_is_created()
         {
             // Act
             var db = await GetDatabase("theDb");
@@ -28,7 +28,7 @@ namespace SAFE.AppendOnlyDb.Tests
         }
 
         [TestMethod]
-        public async Task DatabaseTests_add_returns_pointer()
+        public async Task AppendAsync_returns_pointer()
         {
             // Arrange
             var db = await GetDatabase("theDb");
@@ -44,25 +44,25 @@ namespace SAFE.AppendOnlyDb.Tests
         }
 
         [TestMethod]
-        public async Task DatabaseTests_returns_stored_value()
+        public async Task GetAtVersionAsync_returns_stored_value()
         {
             // Arrange
             var db = await GetDatabase("theDb");
-            var theData = 42;
+            var theData = "theData";
             _ = await db.AppendAsync("theStream", theData).ConfigureAwait(false);
 
             // Act
-            var findResult = await db.GetVersionAsync<int>("theStream", 0).ConfigureAwait(false);
+            var findResult = await db.GetAtVersionAsync<string>("theStream", 0).ConfigureAwait(false);
 
             // Assert
             Assert.IsNotNull(findResult);
-            Assert.IsInstanceOfType(findResult, typeof(Result<int>));
+            Assert.IsInstanceOfType(findResult, typeof(Result<string>));
             Assert.IsTrue(findResult.HasValue);
             Assert.AreEqual(theData, findResult.Value);
         }
 
-        [TestMethod] // Quite long running, so do not include in automatic test suite.
-        public async Task DatabaseTests_adds_more_than_md_capacity()
+        [TestMethod]
+        public async Task StreamDb_adds_more_than_md_capacity()
         {
             // Arrange
             var db = await GetDatabase("theDb");
@@ -88,7 +88,7 @@ namespace SAFE.AppendOnlyDb.Tests
             }
 
             // Assert 2
-            var stream = (await db.GetStream<int>(theStream)).ToList();
+            var stream = await db.GetStreamAsync<int>(theStream).ToListAsync();
             Assert.IsNotNull(stream);
             Assert.AreEqual(addCount, stream.Count);
         }

@@ -21,18 +21,20 @@ namespace SAFE.AppendOnlyDb
             return await stream.AppendAsync(new StoredValue(data));
         }
 
-        public async Task<IEnumerable<T>> GetAsync()
+        public async IAsyncEnumerable<T> GetAsync()
         {
             var stream = await GetStreamAsync();
-            return (await stream.GetAllValuesAsync())
+            var items = stream.GetAllValuesAsync()
                 .Select(c => c.Parse<T>());
+            await foreach (var item in items)
+                yield return item;
         }
 
-        public async Task<Result<Pointer>> SetAsync(IEnumerable<T> reordered)
+        public async Task<Result<Pointer>> SetAsync(IAsyncEnumerable<T> reordered)
         {
             var md = await MdAccess.CreateAsync();
             IStreamAD newStream = new DataTree(md, (t) => throw new NotSupportedException());
-            foreach (var elem in reordered)
+            await foreach (var elem in reordered)
                 await newStream.AppendAsync(new StoredValue(elem));
             return await _root.SetAsync(new StoredValue(md.MdLocator));
         }
@@ -42,7 +44,7 @@ namespace SAFE.AppendOnlyDb
             var collection = await _root.GetValueAsync();
             if (collection is DataNotFound<StoredValue>)
             {
-                await SetAsync(new List<T>());
+                await SetAsync(AsyncEnumerable.Empty<T>());
                 collection = await _root.GetValueAsync();
             }
             

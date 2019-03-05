@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using SAFE.Data;
 using SafeApp.Utilities;
@@ -116,21 +117,18 @@ namespace SAFE.AppendOnlyDb.Network
         /// <typeparam name="T"></typeparam>
         /// <param name="leftFold">The aggregating function</param>
         /// <returns>true if snapshot was stored, false if already existed</returns>
-        public async Task<Result<bool>> Snapshot<T>(Func<IEnumerable<T>, byte[]> leftFold)
+        public async Task<Result<bool>> Snapshot<T>(Func<IAsyncEnumerable<T>, byte[]> leftFold)
         {
             if (!IsFull)
                 return new InvalidOperation<bool>("Cannot snapshot unless Md is full!");
             if (await _dataOps.ContainsKeyAsync(Constants.SNAPSHOT_KEY))
                 return Result.OK(false); // already snapshotted, i.e. OK with changed=false
 
-            var entries = await _dataOps.GetEntriesAsync<ulong, StoredValue>((k) => ulong.Parse(k));
-            var parsedEntries = new ConcurrentDictionary<ulong, T>();
+            var entries = _dataOps.GetEntriesAsync<ulong, StoredValue>((k) => ulong.Parse(k));
 
-            Parallel.ForEach(entries, e => parsedEntries[e.Item1] = e.Item2.Parse<T>());
-
-            var ordered = parsedEntries
-                .OrderBy(c => c.Key)
-                .Select(c => c.Value);
+            var ordered = entries
+                .OrderBy(c => c.Item1)
+                .Select(c => c.Item2.Parse<T>());
 
             var snapshot = leftFold(ordered);
 
@@ -174,14 +172,12 @@ namespace SAFE.AppendOnlyDb.Network
             {
                 case AnyVersion _:
                     break;
-                case SpecificVersion specific:
-                    if (specific != this.Version)
-                        return new VersionMismatch<ExpectedVersion>();
-                    break;
-                case NoVersion noversion:
-                    if (noversion != this.Version)
-                        return new VersionMismatch<ExpectedVersion>();
-                    break;
+                case SpecificVersion specific 
+                    when specific != this.Version:
+                    return new VersionMismatch<ExpectedVersion>();
+                case NoVersion noversion 
+                    when noversion != this.Version:
+                    return new VersionMismatch<ExpectedVersion>();
                 case null:
                 default:
                     throw new ArgumentOutOfRangeException(nameof(expectedVersion));
@@ -192,7 +188,7 @@ namespace SAFE.AppendOnlyDb.Network
         async Task AddObjectAsync(string key, object value)
         {
             await _dataOps.AddObjectAsync(key, value).ConfigureAwait(false);
-            ++_count;
+            Interlocked.Increment(ref _count);
         }
 
         async Task GetOrAddMetadata(MdMetadata metadata = null)
@@ -205,7 +201,7 @@ namespace SAFE.AppendOnlyDb.Network
                 return;
             }
 
-            metadata = metadata ?? new MdMetadata();
+            metadata ??= new MdMetadata();
             await _dataOps.AddObjectAsync(Constants.METADATA_KEY, metadata).ConfigureAwait(false);
 
             _metadata = metadata;

@@ -30,24 +30,28 @@ namespace SAFE.AppendOnlyDb
 
             var db = new StreamDb(streamStore);
 
-            var streams = await streamStore.GetAllAsync().ConfigureAwait(false);
-            db._dataTreeAddresses = new ConcurrentDictionary<string, MdLocator>(streams
-                .ToDictionary(c => c.Item1, c => c.Item2));
+            var streams = await streamStore.GetAllAsync()
+                .ToDictionaryAsync(c => c.Item1, c => c.Item2);
+
+            db._dataTreeAddresses = new ConcurrentDictionary<string, MdLocator>(streams);
 
             return Result.OK((IStreamDb)db);
         }
 
-        public async Task<IEnumerable<T>> GetStream<T>(string streamKey)
+        public async IAsyncEnumerable<T> GetStreamAsync<T>(string streamKey)
         {
             if (!_dataTreeCache.ContainsKey(streamKey))
                 await LoadStoreAsync(streamKey).ConfigureAwait(false);
 
-            return (await _dataTreeCache[streamKey]
-                .ReadForwardFromAsync(0))
+            var items = _dataTreeCache[streamKey]
+                .ReadForwardFromAsync(0)
                 .Select(c => c.Item2.Parse<T>());
+
+            await foreach (var item in items)
+                yield return item;
         }
 
-        public async Task<Result<T>> GetVersionAsync<T>(string streamKey, ulong version)
+        public async Task<Result<T>> GetAtVersionAsync<T>(string streamKey, ulong version)
         {
             if (!_dataTreeCache.ContainsKey(streamKey))
                 await LoadStoreAsync(streamKey).ConfigureAwait(false);

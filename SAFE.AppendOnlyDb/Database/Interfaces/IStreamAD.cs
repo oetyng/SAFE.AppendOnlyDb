@@ -12,11 +12,11 @@ namespace SAFE.AppendOnlyDb
 
         Task<Result<StoredValue>> GetVersionAsync(ulong version);
 
-        Task<IOrderedEnumerable<(ulong, StoredValue)>> ReadForwardFromAsync(ulong from);
-        Task<IOrderedEnumerable<(ulong, StoredValue)>> ReadBackwardsFromAsync(ulong from);
-        Task<IEnumerable<(ulong, StoredValue)>> GetRangeAsync(ulong from, ulong to);
+        IOrderedAsyncEnumerable<(ulong, StoredValue)> ReadForwardFromAsync(ulong from);
+        IOrderedAsyncEnumerable<(ulong, StoredValue)> ReadBackwardsFromAsync(ulong from);
+        IAsyncEnumerable<(ulong, StoredValue)> GetRangeAsync(ulong from, ulong to);
 
-        Task<IEnumerable<StoredValue>> GetAllValuesAsync();
-        Task<IEnumerable<(Pointer, StoredValue)>> GetAllPointerValuesAsync();
+        IAsyncEnumerable<StoredValue> GetAllValuesAsync();
+        IAsyncEnumerable<(Pointer, StoredValue)> GetAllPointerValuesAsync();
     }
 }

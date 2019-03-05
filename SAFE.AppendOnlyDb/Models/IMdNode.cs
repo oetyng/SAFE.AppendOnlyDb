@@ -22,8 +22,9 @@ namespace SAFE.AppendOnlyDb
         // StreamAD
         Task<Result<Pointer>> AppendAsync(StoredValue value);
         Task<Result<StoredValue>> FindAsync(ulong version);
-        Task<IEnumerable<(ulong, StoredValue)>> FindRangeAsync(ulong from, ulong to); // from and to can be any values
-        Task<IEnumerable<StoredValue>> GetAllValuesAsync();
+        IAsyncEnumerable<(ulong, StoredValue)> ReadToEndAsync(ulong from);
+        IAsyncEnumerable<(ulong, StoredValue)> FindRangeAsync(ulong from, ulong to); // from and to can be any values
+        IAsyncEnumerable<StoredValue> GetAllValuesAsync();
 
         // ValueAD
         Task<Result<StoredValue>> GetLastVersionAsync(); // GetValueAsync
@@ -35,9 +36,9 @@ namespace SAFE.AppendOnlyDb
         // Internal
         Task<Result<Pointer>> AddAsync(Pointer pointer);
         Task<Result<StoredValue>> GetValueAsync(ulong version);
-        Task<IEnumerable<(Pointer, StoredValue)>> GetAllPointerValuesAsync(); // dubious: consider getting for range instead
+        IAsyncEnumerable<(Pointer, StoredValue)> GetAllPointerValuesAsync(); // dubious: consider getting for range instead
         Task<Result<(Pointer, StoredValue)>> GetPointerAndValueAsync(ulong version); // for indexing
-        Task<Result<bool>> Snapshot<T>(Func<IEnumerable<T>, byte[]> leftFold); // dubious: consider passing Snapshot class to ctor?
+        Task<Result<bool>> Snapshot<T>(Func<IAsyncEnumerable<T>, byte[]> leftFold); // dubious: consider passing Snapshot class to ctor?
         Task<Result<bool>> SetNext(IMdNode node); // dubious: mixed level of responsibility for setting previous and next
         Task<ulong> GetCount(); // dubious
     }

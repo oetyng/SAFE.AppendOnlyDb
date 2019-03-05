@@ -38,7 +38,14 @@ namespace SAFE.AppendOnlyDb.Network
                 return TaskFrom(new KeyNotFound<StoredValue>($"{version}"));
         }
 
-        public async Task<IEnumerable<(ulong, StoredValue)>> FindRangeAsync(ulong from, ulong to)
+        public async IAsyncEnumerable<(ulong, StoredValue)> ReadToEndAsync(ulong from)
+        {
+            var end = await GetCount();
+            await foreach (var item in FindRangeAsync(from, to: end))
+                yield return item;
+        }
+
+        public async IAsyncEnumerable<(ulong, StoredValue)> FindRangeAsync(ulong from, ulong to)
         {
             var min = Math.Min(from, to);
             var max = Math.Max(from, to);
@@ -46,86 +53,92 @@ namespace SAFE.AppendOnlyDb.Network
             if (0 > max) max = 0;
 
             if (Contains(min) && Contains(max))
-                return await FindRangeHereAsync(min, max);
+                await foreach (var item in FindRangeHereAsync(min, max))
+                    yield return item;
             else if (Contains(min))
             {
                 if (IsFull)
                 {
-                    var here = await FindRangeHereAsync(min, EndIndex);
-                    var next = await FindRangeInNextAsync(EndIndex + 1, max);
-                    return here.Concat(next);
+                    var here = FindRangeHereAsync(min, EndIndex);
+                    var next = FindRangeInNextAsync(EndIndex + 1, max);
+                    await foreach (var item in here.Concat(next))
+                        yield return item;
                 }
                 else
-                    return await FindRangeHereAsync(min, NextVersion - 1);
+                    await foreach (var item in FindRangeHereAsync(min, NextVersion - 1))
+                        yield return item;
             }
             else if (Contains(max))
             {
-                var here = await FindRangeHereAsync(StartIndex, max);
-                var previous = await FindRangeInPreviousAsync(min, StartIndex - 1);
-                return here.Concat(previous);
+                var here = FindRangeHereAsync(StartIndex, max);
+                var previous = FindRangeInPreviousAsync(min, StartIndex - 1);
+                await foreach (var item in here.Concat(previous))
+                    yield return item;
             }
-            else
-                return new List<(ulong, StoredValue)>();
         }
 
-        async Task<IEnumerable<(ulong, StoredValue)>> FindRangeHereAsync(ulong min, ulong max)
+        async IAsyncEnumerable<(ulong, StoredValue)> FindRangeHereAsync(ulong min, ulong max)
         {
             switch (Type)
             {
                 case MdType.Values:
-                    return await _dataOps.GetEntriesAsync<ulong, StoredValue>(
+                    var entries = _dataOps.GetEntriesAsync<ulong, StoredValue>(
                         k => ulong.Parse(k),
                         k => k >= min && max >= k); // VERY SLOW WHEN DEBUGGING
+
+                    await foreach (var item in entries)
+                        yield return item;
+
+                    break;
+
                 case MdType.Pointers:
                     var indexMin = (ulong)Math.Truncate(min / Math.Pow(Constants.MdCapacity, Level));
                     var indexMax = (ulong)Math.Truncate(max / Math.Pow(Constants.MdCapacity, Level));
-                    var pointers = await _dataOps.GetEntriesAsync<ulong, Pointer>(
+                    var pointers = _dataOps.GetEntriesAsync<ulong, Pointer>(
                         k => ulong.Parse(k),
-                        k => k >= indexMin && indexMax >= k);
+                        k => k >= indexMin && indexMax >= k)
+                        .Select(c => c.Item2.MdLocator);
 
-                    var targetTasks = pointers.Select(c => LocateAsync(c.Item2.MdLocator, _dataOps.Session));
-                    var targets = await Task.WhenAll(targetTasks);
-                    var concurrent = targets
+                    var items = LocateMany(pointers)
                         .Where(c => c.HasValue)
                         .Select(c => c.Value)
-                        .Where(c => !(c.Version is NoVersion)) // might be unnecesary safety measure
-                        .Select(c => c.FindRangeAsync(
+                        .Where(c => !(c.Version is NoVersion)) // might be unnecessary safety measure;
+                        .SelectMany(c => c.FindRangeAsync(
                             Math.Max(indexMin, c.StartIndex),
                             Math.Max(indexMax, (ulong)c.Version.Value)));
-                    var all = await Task.WhenAll(concurrent);
-                    return all.SelectMany(c => c);
 
-                    //var concurrent = targets
-                    //    .Where(c => c.HasValue)
-                    //    .Select(c => c.Value)
-                    //    .Where(c => !(c.Version is NoVersion))
-                    //    .ToList();
-                    //var all = new List<(ulong, StoredValue)>();
-                    //foreach (var c in concurrent)
-                    //{
-                    //    var range = (await c.FindRangeAsync(
-                    //        Math.Max(indexMin, c.StartIndex),
-                    //        Math.Max(indexMax, (ulong)c.Version.Value))).ToList();
-                    //    all.AddRange(range);
-                    //}
-                    //return all;
+                    await foreach (var item in items)
+                        yield return item;
+
+                    break;
+
                 default:
-                    return new List<(ulong, StoredValue)>();
+                    break;
             }
         }
 
-        async Task<IEnumerable<(ulong, StoredValue)>> FindRangeInNextAsync(ulong min, ulong max)
+        async IAsyncEnumerable<Result<IMdNode>> LocateMany(IAsyncEnumerable<MdLocator> locators)
+        {
+            await foreach (var locator in locators)
+                yield return await LocateAsync(locator, _dataOps.Session);
+        }
+
+        async IAsyncEnumerable<(ulong, StoredValue)> FindRangeInNextAsync(ulong min, ulong max)
         {
             var targetResult = await LocateAsync(Next, _dataOps.Session)
                 .ConfigureAwait(false);
-            return await targetResult.Value.FindRangeAsync(min, max).ConfigureAwait(false);
+            var range = targetResult.Value.FindRangeAsync(min, max).ConfigureAwait(false);
+            await foreach (var item in range)
+                yield return item;
         }
 
-        async Task<IEnumerable<(ulong, StoredValue)>> FindRangeInPreviousAsync(ulong min, ulong max)
+        async IAsyncEnumerable<(ulong, StoredValue)> FindRangeInPreviousAsync(ulong min, ulong max)
         {
             var targetResult = await LocateAsync(Previous, _dataOps.Session)
                 .ConfigureAwait(false);
-            return await targetResult.Value.FindRangeAsync(min, max).ConfigureAwait(false);
+            var range = targetResult.Value.FindRangeAsync(min, max).ConfigureAwait(false);
+            await foreach (var item in range)
+                yield return item;
         }
 
         async Task<Result<StoredValue>> FindHereAsync(ulong version)

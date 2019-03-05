@@ -37,11 +37,15 @@ namespace SAFE.AppendOnlyDb.Network
             return keys.Any(c => c.SequenceEqual(encryptedKey));
         }
 
-        public async Task<IEnumerable<string>> GetKeysAsync()
+        public async IAsyncEnumerable<string> GetKeysAsync()
         {
             var keyEntries = await Session.MData.ListKeysAsync(_mdInfo).ConfigureAwait(false);
             var keyTasks = keyEntries.Select(c => Session.MDataInfoActions.DecryptAsync(_mdInfo, c.Key));
-            return (await Task.WhenAll(keyTasks).ConfigureAwait(false)).Select(c => c.ToUtfString());
+            foreach (var entry in keyEntries)
+            {
+                var key = await Session.MDataInfoActions.DecryptAsync(_mdInfo, entry.Key);
+                yield return key.ToUtfString();
+            }
         }
 
         public async Task<T> GetValueAsync<T>(string key)
@@ -71,83 +75,63 @@ namespace SAFE.AppendOnlyDb.Network
             return (val.ToUtfString(), mdRef.Item2);
         }
 
-        public async Task<IEnumerable<T>> GetValuesAsync<T>()
+        public async IAsyncEnumerable<T> GetValuesAsync<T>()
         {
-            var entries = new ConcurrentBag<T>();
-
-            var maps = new ConcurrentBag<List<byte>>();
-
             using (var entriesHandle = await Session.MDataEntries.GetHandleAsync(_mdInfo).ConfigureAwait(false))
             {
                 // Fetch and decrypt entries
                 var encryptedEntries = await Session.MData.ListEntriesAsync(entriesHandle).ConfigureAwait(false);
-                Parallel.ForEach(encryptedEntries, entry =>
+                foreach (var entry in encryptedEntries)
                 {
                     // protects against deleted entries
                     if (entry.Value.Content.Count != 0)
                     {
                         if (entry.Value.Content.Count < 50) // protects against the zero index 0 or 1 value.
-                            return;
-                        var decryptedValue = Session.MDataInfoActions.DecryptAsync(_mdInfo, entry.Value.Content).GetAwaiter().GetResult();
-                        maps.Add(decryptedValue);
+                            continue;
+                        var decryptedValue = await Session.MDataInfoActions.DecryptAsync(_mdInfo, entry.Value.Content).ConfigureAwait(false);
+                        var data = await GetImD(decryptedValue);
+                        if (data.ToUtfString().TryParse(out T result))
+                            yield return result;
                     }
-                });
+                }
             }
-
-            // get ImD
-            var tasks = maps.Select(c => GetImD(c));
-            var data = await Task.WhenAll(tasks);
-            Parallel.ForEach(data, c =>
-            {
-                if (c.ToUtfString().TryParse(out T result))
-                    entries.Add(result);
-            });
-
-            return entries;
         }
 
-        public Task<IEnumerable<(TKey, TVal)>> GetEntriesAsync<TKey, TVal>(Func<string, TKey> keyParser)
+        public IAsyncEnumerable<(TKey, TVal)> GetEntriesAsync<TKey, TVal>(Func<string, TKey> keyParser)
             => GetEntriesAsync<TKey, TVal>(keyParser, k => true);
 
-        public async Task<IEnumerable<(TKey, TVal)>> GetEntriesAsync<TKey, TVal>(Func<string, TKey> keyParser, Func<TKey, bool> selector)
+        public async IAsyncEnumerable<(TKey, TVal)> GetEntriesAsync<TKey, TVal>(Func<string, TKey> keyParser, Func<TKey, bool> selector)
         {
-            var tasks = new ConcurrentDictionary<TKey, Task<List<byte>>>();
-
             using (var entriesHandle = await Session.MDataEntries.GetHandleAsync(_mdInfo).ConfigureAwait(false))
             {
                 // Fetch and decrypt entries
                 var encryptedEntries = await Session.MData.ListEntriesAsync(entriesHandle).ConfigureAwait(false);
-                Parallel.ForEach(encryptedEntries, entry =>
+                //Parallel.ForEach(encryptedEntries, entry =>
+                foreach (var entry in encryptedEntries)
                 {
                     // protects against deleted entries // should not be valid operation on append only though
                     if (entry.Value.Content.Count != 0)
                     {
-                        var decryptedKey = Session.MDataInfoActions.DecryptAsync(_mdInfo, entry.Key.Key).GetAwaiter().GetResult();
+                        var decryptedKey = await Session.MDataInfoActions.DecryptAsync(_mdInfo, entry.Key.Key);
                         var keystring = decryptedKey.ToUtfString();
                         if (keystring == Constants.METADATA_KEY || keystring == Constants.SNAPSHOT_KEY)
-                            return;
+                            continue;
 
                         var key = keyParser(keystring);
                         if (!selector(key)) // within range forexample
-                            return;
+                            continue;
 
-                        var decryptedValue = Session.MDataInfoActions.DecryptAsync(_mdInfo, entry.Value.Content).GetAwaiter().GetResult();
-                        tasks.TryAdd(key, GetImD(decryptedValue));
+                        var decryptedValue = await Session.MDataInfoActions.DecryptAsync(_mdInfo, entry.Value.Content);
+
+                        var data = await GetImD(decryptedValue);
+                        if (data.ToUtfString().TryParse(out TVal result))
+                            yield return (key, result);
                     }
-                });
+                }
             }
-
-            var data = await tasks.ToValues();
-            var entries = new ConcurrentBag<(TKey, TVal)>();
-            Parallel.ForEach(data, c =>
-            {
-                if (c.Value.ToUtfString().TryParse(out TVal result))
-                    entries.Add((c.Key, result));
-            });
-
-            return entries;
         }
 
+        [Obsolete]
         public async Task<List<MDataEntry>> GetEntriesAsync()
         {
             var entries = new ConcurrentBag<MDataEntry>();
@@ -180,14 +164,11 @@ namespace SAFE.AppendOnlyDb.Network
         {
             using (var entryActionsH = await Session.MDataEntryActions.NewAsync().ConfigureAwait(false))
             {
-                // insert value
                 var insertObj = new Dictionary<string, object>
                 {
                     { key, value }
                 };
                 await InsertEntriesAsync(entryActionsH, insertObj).ConfigureAwait(false);
-
-                // commit
                 await CommitEntryMutationAsync(entryActionsH).ConfigureAwait(false);
             }
         }
@@ -196,7 +177,6 @@ namespace SAFE.AppendOnlyDb.Network
         {
             using (var entryActionsH = await Session.MDataEntryActions.NewAsync().ConfigureAwait(false))
             {
-                // update value
                 var updateObj = new Dictionary<string, (object, ulong)>
                     {
                         { key, (value, version + 1) },
@@ -210,14 +190,11 @@ namespace SAFE.AppendOnlyDb.Network
         {
             using (var entryActionsH = await Session.MDataEntryActions.NewAsync().ConfigureAwait(false))
             {
-                // delete
                 var deleteObj = new Dictionary<string, ulong>
                 {
                     { key, version + 1 }
                 };
                 await DeleteEntriesAsync(entryActionsH, deleteObj).ConfigureAwait(false);
-
-                // commit
                 await CommitEntryMutationAsync(entryActionsH).ConfigureAwait(false);
             }
         }
@@ -267,10 +244,8 @@ namespace SAFE.AppendOnlyDb.Network
         }
 
         // Commit the operations in the md entry actions handle.
-        public async Task CommitEntryMutationAsync(NativeHandle entryActionsH)
-        {
-            await Session.MData.MutateEntriesAsync(_mdInfo, entryActionsH).ConfigureAwait(false); // <----------------------------------------------    Commit ------------------------
-        }
+        public Task CommitEntryMutationAsync(NativeHandle entryActionsH)
+            => Session.MData.MutateEntriesAsync(_mdInfo, entryActionsH); // <----------------------------------------------    Commit ------------------------
 
         // While map size is too large for an MD entry
         // store the map as ImD.

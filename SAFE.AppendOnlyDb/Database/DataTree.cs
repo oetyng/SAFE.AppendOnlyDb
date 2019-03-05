@@ -22,23 +22,23 @@ namespace SAFE.AppendOnlyDb
 
         #region StreamAD
 
-        Task<IEnumerable<StoredValue>> IStreamAD.GetAllValuesAsync()
+        IAsyncEnumerable<StoredValue> IStreamAD.GetAllValuesAsync()
             => _head.GetAllValuesAsync();
 
-        Task<IEnumerable<(Pointer, StoredValue)>> IStreamAD.GetAllPointerValuesAsync()
+        IAsyncEnumerable<(Pointer, StoredValue)> IStreamAD.GetAllPointerValuesAsync()
             => _head.GetAllPointerValuesAsync();
 
         Task<Result<StoredValue>> IStreamAD.GetVersionAsync(ulong version)
             => _head.FindAsync(version);
 
-        Task<IEnumerable<(ulong, StoredValue)>> IStreamAD.GetRangeAsync(ulong from, ulong to)
+        IAsyncEnumerable<(ulong, StoredValue)> IStreamAD.GetRangeAsync(ulong from, ulong to)
             => _head.FindRangeAsync(from, to);
 
-        public async Task<IOrderedEnumerable<(ulong, StoredValue)>> ReadForwardFromAsync(ulong from)
-            => (await _head.FindRangeAsync(from, await _head.GetCount())).OrderBy(c => c.Item1); // consider returning IAsyncEnumerable
+        public IOrderedAsyncEnumerable<(ulong, StoredValue)> ReadForwardFromAsync(ulong from)
+            => _head.ReadToEndAsync(from).OrderBy(c => c.Item1);
 
-        public async Task<IOrderedEnumerable<(ulong, StoredValue)>> ReadBackwardsFromAsync(ulong from)
-            => (await _head.FindRangeAsync(0, from)).OrderByDescending(c => c.Item1);
+        public IOrderedAsyncEnumerable<(ulong, StoredValue)> ReadBackwardsFromAsync(ulong from)
+            => _head.FindRangeAsync(0, from).OrderByDescending(c => c.Item1);
 
         /// <summary>
         /// Adds data to a tree structure

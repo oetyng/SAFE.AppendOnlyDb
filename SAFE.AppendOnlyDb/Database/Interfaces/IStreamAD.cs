@@ -8,9 +8,9 @@ namespace SAFE.AppendOnlyDb
     internal interface IStreamAD : IData
     {
         Task<Result<Pointer>> AppendAsync(StoredValue value);
-        Task<Result<Pointer>> TryAppendAsync(StoredValue value, ulong expectedVersion);
+        Task<Result<Pointer>> TryAppendAsync(StoredValue value, ExpectedVersion expectedVersion);
 
-        Task<Result<StoredValue>> GetVersionAsync(ulong version);
+        Task<Result<StoredValue>> GetAtVersionAsync(ulong version);
 
         IOrderedAsyncEnumerable<(ulong, StoredValue)> ReadForwardFromAsync(ulong from);
         IOrderedAsyncEnumerable<(ulong, StoredValue)> ReadBackwardsFromAsync(ulong from);

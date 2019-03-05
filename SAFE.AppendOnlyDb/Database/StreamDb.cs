@@ -57,7 +57,7 @@ namespace SAFE.AppendOnlyDb
                 await LoadStoreAsync(streamKey).ConfigureAwait(false);
 
             var value = await _dataTreeCache[streamKey]
-                .GetVersionAsync(version)
+                .GetAtVersionAsync(version)
                 .ConfigureAwait(false);
 
             if (!value.HasValue)

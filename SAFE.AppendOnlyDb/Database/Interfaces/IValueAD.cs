@@ -7,6 +7,6 @@ namespace SAFE.AppendOnlyDb
     {
         Task<Result<StoredValue>> GetValueAsync();
         Task<Result<Pointer>> SetAsync(StoredValue value);
-        Task<Result<Pointer>> TrySetAsync(StoredValue value, ulong expectedVersion);
+        Task<Result<Pointer>> TrySetAsync(StoredValue value, ExpectedVersion expectedVersion);
     }
 }

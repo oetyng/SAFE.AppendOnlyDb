@@ -178,6 +178,12 @@ namespace SAFE.AppendOnlyDb.Network
                 case NoVersion noversion 
                     when noversion != this.Version:
                     return new VersionMismatch<ExpectedVersion>();
+                case SpecificVersion specific
+                    when specific == this.Version:
+                    break;
+                case NoVersion noversion
+                    when noversion == this.Version:
+                    break;
                 case null:
                 default:
                     throw new ArgumentOutOfRangeException(nameof(expectedVersion));

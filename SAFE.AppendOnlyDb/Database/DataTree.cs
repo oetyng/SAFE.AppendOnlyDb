@@ -28,7 +28,7 @@ namespace SAFE.AppendOnlyDb
         IAsyncEnumerable<(Pointer, StoredValue)> IStreamAD.GetAllPointerValuesAsync()
             => _head.GetAllPointerValuesAsync();
 
-        Task<Result<StoredValue>> IStreamAD.GetVersionAsync(ulong version)
+        Task<Result<StoredValue>> IStreamAD.GetAtVersionAsync(ulong version)
             => _head.FindAsync(version);
 
         IAsyncEnumerable<(ulong, StoredValue)> IStreamAD.GetRangeAsync(ulong from, ulong to)
@@ -50,8 +50,8 @@ namespace SAFE.AppendOnlyDb
         Task<Result<Pointer>> IStreamAD.AppendAsync(StoredValue value)
             => TryAppendAsync(value, ExpectedVersion.Any);
 
-        Task<Result<Pointer>> IStreamAD.TryAppendAsync(StoredValue value, ulong expectedVersion)
-            => TryAppendAsync(value, ExpectedVersion.Specific(expectedVersion));
+        Task<Result<Pointer>> IStreamAD.TryAppendAsync(StoredValue value, ExpectedVersion expectedVersion)
+            => TryAppendAsync(value, expectedVersion);
 
         #endregion StreamAD
 
@@ -65,8 +65,8 @@ namespace SAFE.AppendOnlyDb
         Task<Result<Pointer>> IValueAD.SetAsync(StoredValue value) 
             => TryAppendAsync(value, ExpectedVersion.Any);
 
-        Task<Result<Pointer>> IValueAD.TrySetAsync(StoredValue value, ulong expectedVersion)
-            => TryAppendAsync(value, ExpectedVersion.Specific(expectedVersion));
+        Task<Result<Pointer>> IValueAD.TrySetAsync(StoredValue value, ExpectedVersion expectedVersion)
+            => TryAppendAsync(value, expectedVersion);
 
         #endregion ValueAD
 

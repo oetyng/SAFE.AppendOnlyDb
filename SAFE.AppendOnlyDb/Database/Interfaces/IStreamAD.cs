@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace SAFE.AppendOnlyDb
 {
-    internal interface IStreamAD : IData
+    public interface IStreamAD : IData
     {
         Task<Result<Pointer>> AppendAsync(StoredValue value);
         Task<Result<Pointer>> TryAppendAsync(StoredValue value, ExpectedVersion expectedVersion);

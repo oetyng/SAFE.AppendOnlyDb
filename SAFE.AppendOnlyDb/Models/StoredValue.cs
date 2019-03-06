@@ -3,7 +3,7 @@ using SAFE.AppendOnlyDb.Utils;
 
 namespace SAFE.AppendOnlyDb
 {
-    internal class StoredValue
+    public class StoredValue
     {
         [JsonConstructor]
         StoredValue()

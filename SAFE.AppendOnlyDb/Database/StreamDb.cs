@@ -36,50 +36,31 @@ namespace SAFE.AppendOnlyDb
             return Result.OK((IStreamDb)db);
         }
 
-        public async IAsyncEnumerable<T> GetStreamAsync<T>(string streamKey)
-        {
-            if (!_dataTreeCache.ContainsKey(streamKey))
-                await LoadStoreAsync(streamKey).ConfigureAwait(false);
-
-            var items = _dataTreeCache[streamKey]
-                .ReadForwardFromAsync(0)
-                .Select(c => c.Item2.Parse<T>());
-
-            await foreach (var item in items)
-                yield return item;
-        }
-
-        public async Task<Result<T>> GetAtVersionAsync<T>(string streamKey, ulong version)
-        {
-            if (!_dataTreeCache.ContainsKey(streamKey))
-                await LoadStoreAsync(streamKey).ConfigureAwait(false);
-
-            var value = await _dataTreeCache[streamKey]
-                .GetAtVersionAsync(version)
-                .ConfigureAwait(false);
-
-            if (!value.HasValue)
-                return Result.Fail<T>((int)value.ErrorCode, value.ErrorMsg);
-
-            return Result.OK(value.Value.Parse<T>());
-        }
-
-        public async Task<Result<Pointer>> AppendAsync(string streamKey, object data)
+        public async Task<Result<IStreamAD>> GetStreamAsync(string streamKey)
         {
             if (!_dataTreeAddresses.ContainsKey(streamKey))
-                await AddStoreAsync(streamKey).ConfigureAwait(false);
+                return new KeyNotFound<IStreamAD>(streamKey);
             if (!_dataTreeCache.ContainsKey(streamKey))
                 await LoadStoreAsync(streamKey).ConfigureAwait(false);
+            return Result.OK(_dataTreeCache[streamKey]);
+        }
 
-            var value = new StoredValue(data);
-            var pointer = await _dataTreeCache[streamKey]
-                .AppendAsync(value)
-                .ConfigureAwait(false);
+        public async Task<Result<bool>> AddStreamAsync(string streamKey)
+        {
+            try
+            {
+                if (_dataTreeAddresses.ContainsKey(streamKey))
+                    return Result.OK(false);
 
-            if (!pointer.HasValue)
-                return pointer;
+                await AddStoreAsync(streamKey).ConfigureAwait(false);
+                await LoadStoreAsync(streamKey).ConfigureAwait(false);
 
-            return pointer;
+                return Result.OK(true);
+            }
+            catch(Exception ex)
+            {
+                return Result.Fail<bool>(-999, ex.Message);
+            }
         }
 
         protected async Task AddStoreAsync(string type)

@@ -1,7 +1,7 @@
 ﻿
 namespace SAFE.AppendOnlyDb
 {
-    internal interface IData
+    public interface IData
     {
         MdLocator MdLocator { get; }
     }

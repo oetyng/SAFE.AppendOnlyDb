@@ -5,6 +5,7 @@
     <LangVersion>8.0</LangVersion>
     <IsPackable>false</IsPackable>
     <DefineConstants>TRACE;SAFE_APP_MOCK</DefineConstants>
+    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>

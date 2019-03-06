@@ -1,7 +1,4 @@
-﻿using System;
-using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SAFE.Data;
 
@@ -16,7 +13,7 @@ namespace SAFE.AppendOnlyDb.Tests
         [TestMethod]
         public async Task Db_is_created()
         {
-            // Act
+            // Arrange + Act
             var db = await GetDatabase("theDb");
 
             // Assert
@@ -25,69 +22,40 @@ namespace SAFE.AppendOnlyDb.Tests
         }
 
         [TestMethod]
-        public async Task AppendAsync_returns_pointer()
+        public async Task Stream_is_added()
         {
             // Arrange
             var db = await GetDatabase("theDb");
-            var theData = 42;
 
             // Act
-            var addResult = await db.AppendAsync("theStream", theData).ConfigureAwait(false);
+            var result = await db.AddStreamAsync("theStream");
 
             // Assert
-            Assert.IsNotNull(addResult);
-            Assert.IsInstanceOfType(addResult, typeof(Result<Pointer>));
-            Assert.IsTrue(addResult.HasValue);
+            Assert.IsNotNull(result);
+            Assert.IsInstanceOfType(result, typeof(Result<bool>));
+            Assert.IsTrue(result.HasValue);
         }
 
         [TestMethod]
-        public async Task GetAtVersionAsync_returns_stored_value()
+        public async Task Stream_is_added_once_only()
         {
             // Arrange
             var db = await GetDatabase("theDb");
-            var theData = "theData";
-            _ = await db.AppendAsync("theStream", theData).ConfigureAwait(false);
+            var result_1 = await db.AddStreamAsync("theStream");
 
             // Act
-            var findResult = await db.GetAtVersionAsync<string>("theStream", 0).ConfigureAwait(false);
+            var result_2 = await db.AddStreamAsync("theStream");
 
             // Assert
-            Assert.IsNotNull(findResult);
-            Assert.IsInstanceOfType(findResult, typeof(Result<string>));
-            Assert.IsTrue(findResult.HasValue);
-            Assert.AreEqual(theData, findResult.Value);
-        }
+            Assert.IsNotNull(result_1);
+            Assert.IsInstanceOfType(result_1, typeof(Result<bool>));
+            Assert.IsTrue(result_1.HasValue);
+            Assert.IsTrue(result_1.Value);
 
-        [TestMethod]
-        public async Task StreamDb_adds_more_than_md_capacity()
-        {
-            // Arrange
-            var db = await GetDatabase("theDb");
-            var theStream = $"theStream";
-
-            var addCount = Math.Round(1.3 * Constants.MdCapacity);
-            var sw = new Stopwatch();
-
-            for (int i = 0; i < addCount; i++)
-            {
-                var theData = i;
-
-                // Act
-                sw.Restart();
-                var addResult = await db.AppendAsync(theStream, theData).ConfigureAwait(false);
-                sw.Stop();
-
-                // Assert 1
-                Assert.IsNotNull(addResult);
-                Assert.IsInstanceOfType(addResult, typeof(Result<Pointer>));
-                Assert.IsTrue(addResult.HasValue);
-                Debug.WriteLine($"{i}: {sw.ElapsedMilliseconds}");
-            }
-
-            // Assert 2
-            var stream = await db.GetStreamAsync<int>(theStream).ToListAsync();
-            Assert.IsNotNull(stream);
-            Assert.AreEqual(addCount, stream.Count);
+            Assert.IsNotNull(result_2);
+            Assert.IsInstanceOfType(result_2, typeof(Result<bool>));
+            Assert.IsTrue(result_2.HasValue);
+            Assert.IsFalse(result_2.Value);
         }
     }
 }

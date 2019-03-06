@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace SAFE.Data.Client
 {
-    internal class SAFEClient : IStorageClient
+    public class SAFEClient : IStorageClient
     {
         readonly SafeApp.Session _session;
         readonly string _appId;
@@ -20,8 +20,6 @@ namespace SAFE.Data.Client
             => _factory = factory;
 
         public async Task<T> GetOrAddDbAsync<T>(string dbId)
-        {
-            return ((Result<T>)await _factory(_session, _appId, dbId)).Value;
-        }
+            => ((Result<T>)await _factory(_session, _appId, dbId)).Value;
     }
 }

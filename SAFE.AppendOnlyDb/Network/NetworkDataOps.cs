@@ -16,14 +16,10 @@ namespace SAFE.AppendOnlyDb.Network
         public Session Session { get; }
 
         public NetworkDataOps(Session session)
-        {
-            Session = session;
-        }
+            => Session = session;
 
         public static async Task<byte[]> GetMdXorName(string plainTextId)
-        {
-            return (await Crypto.Sha3HashAsync(plainTextId.ToUtfBytes())).ToArray();
-        }
+            => (await Crypto.Sha3HashAsync(plainTextId.ToUtfBytes())).ToArray();
 
         // Creates with data.
 
@@ -32,10 +28,8 @@ namespace SAFE.AppendOnlyDb.Network
         /// </summary>
         /// <param name="permissionsHandle"></param>
         /// <returns>SerialisedMdInfo</returns>
-        public async Task<MDataInfo> CreateEmptyRandomPrivateMd(NativeHandle permissionsHandle, ulong protocol)
-        {
-            return await CreateRandomPrivateMd(permissionsHandle, NativeHandle.EmptyMDataEntries, protocol);
-        }
+        public Task<MDataInfo> CreateEmptyRandomPrivateMd(NativeHandle permissionsHandle, ulong protocol)
+            => CreateRandomPrivateMd(permissionsHandle, NativeHandle.EmptyMDataEntries, protocol);
 
         /// <summary>
         /// </summary>
@@ -53,15 +47,8 @@ namespace SAFE.AppendOnlyDb.Network
         {
             var md = new MDataInfo { Name = xor, TypeTag = protocol };
 
-            try
-            {
-                await Session.MData.ListKeysAsync(md);
-            }
-            catch
-            {
-                // (System.Exception ex)
-                return new KeyNotFound<MDataInfo>($"Could not find Md with tag type {protocol} and address {xor}");
-            }
+            try { await Session.MData.ListKeysAsync(md); }
+            catch { return new KeyNotFound<MDataInfo>($"Could not find Md with tag type {protocol} and address {xor}"); }
 
             return Result.OK(md);
         }
@@ -70,15 +57,8 @@ namespace SAFE.AppendOnlyDb.Network
         {
             var md = new MDataInfo { Name = xor, TypeTag = protocol };
 
-            try
-            {
-                await Session.MData.ListKeysAsync(md);
-            }
-            catch
-            {
-                // (System.Exception ex)
-                return new KeyNotFound<MDataInfo>($"Could not find Md with tag type {protocol} and address {xor}");
-            }
+            try { await Session.MData.ListKeysAsync(md); }
+            catch { return new KeyNotFound<MDataInfo>($"Could not find Md with tag type {protocol} and address {xor}"); }
 
             md = await Session.MDataInfoActions.NewPrivateAsync(xor, protocol, secEncKey, nonce);
             return Result.OK(md);
@@ -126,13 +106,11 @@ namespace SAFE.AppendOnlyDb.Network
         public async Task<byte[]> StoreImmutableData(byte[] payload)
         {
             using (var cipherOptHandle = await Session.CipherOpt.NewPlaintextAsync())
+            using (var seWriterHandle = await Session.IData.NewSelfEncryptorAsync())
             {
-                using (var seWriterHandle = await Session.IData.NewSelfEncryptorAsync())
-                {
-                    await Session.IData.WriteToSelfEncryptorAsync(seWriterHandle, payload.ToList());
-                    var datamap = await Session.IData.CloseSelfEncryptorAsync(seWriterHandle, cipherOptHandle);
-                    return datamap;
-                }
+                await Session.IData.WriteToSelfEncryptorAsync(seWriterHandle, payload.ToList());
+                var datamap = await Session.IData.CloseSelfEncryptorAsync(seWriterHandle, cipherOptHandle);
+                return datamap;
             }
         }
 
@@ -149,13 +127,11 @@ namespace SAFE.AppendOnlyDb.Network
         public async Task<List<byte>> StoreImmutableData(List<byte> payload)
         {
             using (var cipherOptHandle = await Session.CipherOpt.NewPlaintextAsync())
+            using (var seWriterHandle = await Session.IData.NewSelfEncryptorAsync())
             {
-                using (var seWriterHandle = await Session.IData.NewSelfEncryptorAsync())
-                {
-                    await Session.IData.WriteToSelfEncryptorAsync(seWriterHandle, payload);
-                    var datamap = await Session.IData.CloseSelfEncryptorAsync(seWriterHandle, cipherOptHandle);
-                    return datamap.ToList();
-                }
+                await Session.IData.WriteToSelfEncryptorAsync(seWriterHandle, payload);
+                var datamap = await Session.IData.CloseSelfEncryptorAsync(seWriterHandle, cipherOptHandle);
+                return datamap.ToList();
             }
         }
 
@@ -174,12 +150,10 @@ namespace SAFE.AppendOnlyDb.Network
             var randomKeyPairTuple = await Session.Crypto.EncGenerateKeyPairAsync();
             byte[] encPublicKey, encSecretKey;
             using (var inboxEncPkH = randomKeyPairTuple.Item1)
+            using (var inboxEncSkH = randomKeyPairTuple.Item2)
             {
-                using (var inboxEncSkH = randomKeyPairTuple.Item2)
-                {
-                    encPublicKey = await Session.Crypto.EncPubKeyGetAsync(inboxEncPkH);
-                    encSecretKey = await Session.Crypto.EncSecretKeyGetAsync(inboxEncSkH);
-                }
+                encPublicKey = await Session.Crypto.EncPubKeyGetAsync(inboxEncPkH);
+                encSecretKey = await Session.Crypto.EncSecretKeyGetAsync(inboxEncSkH);
             }
             return (encPublicKey, encSecretKey);
         }

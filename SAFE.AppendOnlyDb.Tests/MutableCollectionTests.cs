@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using SAFE.Data;
 
 namespace SAFE.AppendOnlyDb.Tests
 {
@@ -11,10 +10,7 @@ namespace SAFE.AppendOnlyDb.Tests
     public class MutableCollectionTests : TestBase
     {
         [TestInitialize]
-        public async Task TestInitialize()
-        {
-            await InitClient();
-        }
+        public async Task TestInitialize() => await InitClient();
 
         async Task<IValueAD> GetValueADAsync()
         {
@@ -29,10 +25,11 @@ namespace SAFE.AppendOnlyDb.Tests
             // Arrange
             var collection = new MutableCollection<int>(await GetValueADAsync());
 
+            // Act
             var empty = await collection.GetAsync()
                 .ToListAsync();
             
-            // Assert 2
+            // Assert
             Assert.IsNotNull(empty);
             Assert.IsInstanceOfType(empty, typeof(List<int>));
             Assert.AreEqual(0, empty.Count);
@@ -48,10 +45,11 @@ namespace SAFE.AppendOnlyDb.Tests
             await collection.AddAsync(1);
             await collection.AddAsync(2);
 
+            // Act
             var values = await collection.GetAsync()
                 .ToListAsync();
 
-            // Assert 2
+            // Assert
             Assert.IsNotNull(values);
             Assert.IsInstanceOfType(values, typeof(List<int>));
             Assert.AreEqual(3, values.Count);

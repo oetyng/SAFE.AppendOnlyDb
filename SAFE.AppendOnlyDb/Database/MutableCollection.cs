@@ -11,9 +11,7 @@ namespace SAFE.AppendOnlyDb
         readonly IValueAD _root;
 
         public MutableCollection(IValueAD root)
-        {
-            _root = root;
-        }
+            => _root = root;
 
         public async Task<Result<Pointer>> AddAsync(T data)
         {

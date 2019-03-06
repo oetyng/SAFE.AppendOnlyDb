@@ -9,7 +9,6 @@
         }
 
         public IMdNode Md { get; }
-
         public string Id { get; }
     }
 }

@@ -21,8 +21,6 @@ namespace SAFE.AppendOnlyDb.Tests
                 _client = await clientFactory.GetMockNetworkClient(Credentials.Random, inMem);
             else // live network
                 throw new NotImplementedException("Live network not yet implemented.");
-
-            //Func<SafeApp.Session, string, string, Task<T>> factory
         }
 
         AppInfo GetAppInfo()

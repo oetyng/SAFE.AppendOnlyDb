@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -125,13 +124,11 @@ namespace SAFE.AppendOnlyDb.Network
                 return Result.OK(false); // already snapshotted, i.e. OK with changed=false
 
             var entries = _dataOps.GetEntriesAsync<ulong, StoredValue>((k) => ulong.Parse(k));
-
             var ordered = entries
                 .OrderBy(c => c.Item1)
                 .Select(c => c.Item2.Parse<T>());
 
             var snapshot = leftFold(ordered);
-
             await _dataOps.AddObjectAsync(Constants.SNAPSHOT_KEY, snapshot);
 
             return Result.OK(true); // OK with changed=true
@@ -145,7 +142,7 @@ namespace SAFE.AppendOnlyDb.Network
                     return Result.OK(false); // no change
                 return new InvalidOperation<bool>($"Cannot change Next. Current: {Next.XORName}");
             }
-            if (!IsFull)
+            else if (!IsFull)
                 return new InvalidOperation<bool>($"Cannot set Next until node is full (Current count: {Count} of capacity {Constants.MdCapacity}.");
 
             var metadata = new MdMetadata
@@ -171,24 +168,18 @@ namespace SAFE.AppendOnlyDb.Network
             switch (expectedVersion)
             {
                 case AnyVersion _:
-                    break;
-                case SpecificVersion specific 
-                    when specific != this.Version:
+                case NoVersion noversion when noversion == this.Version:
+                case SpecificVersion specific when specific == this.Version:
+                    return Result.OK(expectedVersion);
+
+                case NoVersion noversion when noversion != this.Version:
+                case SpecificVersion specific when specific != this.Version:
                     return new VersionMismatch<ExpectedVersion>();
-                case NoVersion noversion 
-                    when noversion != this.Version:
-                    return new VersionMismatch<ExpectedVersion>();
-                case SpecificVersion specific
-                    when specific == this.Version:
-                    break;
-                case NoVersion noversion
-                    when noversion == this.Version:
-                    break;
+
                 case null:
                 default:
                     throw new ArgumentOutOfRangeException(nameof(expectedVersion));
             }
-            return Result.OK(expectedVersion);
         }
 
         async Task AddObjectAsync(string key, object value)
@@ -221,11 +212,9 @@ namespace SAFE.AppendOnlyDb.Network
             if (Level == 0)
                 return new ArgumentOutOfRange<Pointer>(nameof(Level));
 
-            var level = this.Level - 1;
-
             var meta = new MdMetadata
             {
-                Level = level,
+                Level = this.Level - 1,
                 Previous = previous?.MdLocator,
                 StartIndex = previous?.EndIndex + 1 ?? 0
             };

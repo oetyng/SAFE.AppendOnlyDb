@@ -19,9 +19,7 @@ namespace SAFE.AppendOnlyDb
         protected ConcurrentDictionary<string, MdLocator> _dataTreeAddresses = new ConcurrentDictionary<string, MdLocator>();
 
         protected StreamDb(IStreamStore streamStore)
-        {
-            _streamStore = streamStore;
-        }
+            => _streamStore = streamStore;
 
         public static async Task<Result<IStreamDb>> GetOrAddAsync(MdHead mdHead)
         {

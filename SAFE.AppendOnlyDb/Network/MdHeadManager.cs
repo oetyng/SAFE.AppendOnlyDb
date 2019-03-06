@@ -14,9 +14,7 @@ namespace SAFE.AppendOnlyDb.Network
         static readonly string MD_CONTAINER_KEY = "md_container";
         static readonly List<byte> MD_CONTAINER_KEY_BYTES = MD_CONTAINER_KEY.ToUtfBytes();
 
-        #pragma warning disable SA1306 // Field names should begin with lower-case letter
         readonly string APP_CONTAINER_PATH;
-        #pragma warning restore SA1306 // Field names should begin with lower-case letter
 
         readonly ulong _protocol;
         readonly NetworkDataOps _dataOps;
@@ -75,9 +73,7 @@ namespace SAFE.AppendOnlyDb.Network
             using (var permissionsHandle = await _dataOps.Session.MDataPermissions.NewAsync())
             {
                 using (var appSignPkH = await _dataOps.Session.Crypto.AppPubSignKeyAsync())
-                {
                     await _dataOps.Session.MDataPermissions.InsertAsync(permissionsHandle, appSignPkH, _dataOps.GetFullPermissions());
-                }
 
                 // New mdHead
                 var mdInfo = await _dataOps.CreateEmptyRandomPrivateMd(permissionsHandle, DataProtocol.DEFAULT_PROTOCOL); // TODO: DataProtocol.MD_HEAD);

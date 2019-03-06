@@ -20,10 +20,6 @@ namespace SAFE.Data.Client
         Mutex _mutex;
         bool _firstApplicationInstance;
 
-        public BrowserAuthAppSynch()
-        {
-        }
-
         public async Task RunAsync(string[] args, AppInfo appInfo, Func<Task> whenFirstInstance)
         {
             if (IsApplicationFirstInstance(appInfo.Name))

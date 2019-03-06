@@ -10,24 +10,14 @@ namespace SAFE.AppendOnlyDb
         static Func<MdMetadata, Task<IMdNode>> _creator;
 
         public static void SetLocator(Func<MdLocator, Task<Result<IMdNode>>> locator)
-        {
-            _locator = locator;
-        }
-
+            => _locator = locator;
         public static void SetCreator(Func<MdMetadata, Task<IMdNode>> creator)
-        {
-            _creator = creator;
-        }
+            => _creator = creator;
 
-        public static Task<Result<IMdNode>> LocateAsync(MdLocator location)
-        {
-            return _locator(location);
-        }
-
-        public static Task<IMdNode> CreateAsync(MdMetadata metadata = null)
-        {
-            return _creator(metadata);
-        }
+        public static Task<Result<IMdNode>> LocateAsync(MdLocator location) 
+            => _locator(location);
+        public static Task<IMdNode> CreateAsync(MdMetadata metadata = null) 
+            => _creator(metadata);
 
         public static void UseInMemoryDb()
         {

@@ -5,7 +5,7 @@
 
     internal struct ManualResetValueTaskSourceLogic<TResult>
     {
-        private ManualResetValueTaskSourceCore<TResult> _core;
+        ManualResetValueTaskSourceCore<TResult> _core;
         public ManualResetValueTaskSourceLogic(IStrongBox<ManualResetValueTaskSourceLogic<TResult>> parent) : this() { }
         public short Version => _core.Version;
         public TResult GetResult(short token) => _core.GetResult(token);

@@ -11,10 +11,8 @@ namespace SAFE.Data.Client.Auth
     {
         readonly AppInfo _appInfo;
 
-        public Authentication(AppInfo appInfo)
-        {
-            _appInfo = appInfo;
-        }
+        public Authentication(AppInfo appInfo) 
+            => _appInfo = appInfo;
 
         public Task<Result<Session>> MockAuthenticationAsync(Credentials credentials)
         {

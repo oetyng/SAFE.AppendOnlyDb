@@ -10,10 +10,7 @@ namespace SAFE.AppendOnlyDb.Tests
     public class StreamADTests : TestBase
     {
         [TestInitialize]
-        public async Task TestInitialize()
-        {
-            await InitClient();
-        }
+        public async Task TestInitialize() => await InitClient();
 
         async Task<IStreamAD> GetStreamADAsync()
         {
@@ -80,11 +77,11 @@ namespace SAFE.AppendOnlyDb.Tests
 
             var expectedVersion = ExpectedVersion.None; // Wrong version, should be ExpectedVersion.Specific(0)
 
-            // Act 2
+            // Act
             var lastValue = "lastValue";
             var addResult = await stream.TryAppendAsync(new StoredValue(lastValue), expectedVersion);
 
-            // Assert 2
+            // Assert
             Assert.IsNotNull(addResult);
             Assert.IsFalse(addResult.HasValue);
             Assert.IsInstanceOfType(addResult, typeof(VersionMismatch<Pointer>));
@@ -101,11 +98,11 @@ namespace SAFE.AppendOnlyDb.Tests
 
             var expectedVersion = ExpectedVersion.Specific(0);
 
-            // Act 2
+            // Act
             var lastValue = "lastValue";
             var addResult = await stream.TryAppendAsync(new StoredValue(lastValue), expectedVersion);
 
-            // Assert 2
+            // Assert
             Assert.IsNotNull(addResult);
             Assert.IsTrue(addResult.HasValue);
             Assert.IsNotInstanceOfType(addResult, typeof(VersionMismatch<Pointer>));

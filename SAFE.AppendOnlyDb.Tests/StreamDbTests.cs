@@ -11,10 +11,7 @@ namespace SAFE.AppendOnlyDb.Tests
     public class StreamDbTests : TestBase
     {
         [TestInitialize]
-        public async Task TestInitialize()
-        {
-            await InitClient();
-        }
+        public async Task TestInitialize() => await InitClient();
 
         [TestMethod]
         public async Task Db_is_created()

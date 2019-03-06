@@ -11,12 +11,12 @@ namespace SAFE.AppendOnlyDb.Network
         public bool Contains(ulong version)
         {
             // can Count be 0 at this point?
-            switch(Type)
+            switch (Type)
             {
                 case MdType.Values:
                     return NextVersion > version && version >= StartIndex;
                 case MdType.Pointers:
-                    var maxVersionHeld = (Count * Math.Pow(Constants.MdCapacity, Level)) - 1; // the node with this EndIndex exists, but we don't know at what version it is
+                    var maxVersionHeld = (Count * Math.Pow(Capacity, Level)) - 1; // the node with this EndIndex exists, but we don't know at what version it is
                     return version >= StartIndex && maxVersionHeld > version;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(Type));
@@ -28,14 +28,10 @@ namespace SAFE.AppendOnlyDb.Network
 
         public Task<Result<StoredValue>> FindAsync(ulong version)
         {
-            if (Contains(version))
-                return FindHereAsync(version);
-            else if (ExistsInNext(version))
-                return FindInNextAsync(version);
-            else if (ExistsInPrevious(version))
-                return FindInPreviousAsync(version);
-            else
-                return TaskFrom(new KeyNotFound<StoredValue>($"{version}"));
+            if (Contains(version)) return FindHereAsync(version);
+            else if (ExistsInNext(version)) return FindInNextAsync(version);
+            else if (ExistsInPrevious(version)) return FindInPreviousAsync(version);
+            else return TaskFrom(new KeyNotFound<StoredValue>($"{version}"));
         }
 
         public async IAsyncEnumerable<(ulong, StoredValue)> ReadToEndAsync(ulong from)
@@ -84,7 +80,7 @@ namespace SAFE.AppendOnlyDb.Network
                 case MdType.Values:
                     var entries = _dataOps.GetEntriesAsync<ulong, StoredValue>(
                         k => ulong.Parse(k),
-                        k => k >= min && max >= k); // VERY SLOW WHEN DEBUGGING
+                        k => k >= min && max >= k);
 
                     await foreach (var item in entries)
                         yield return item;
@@ -92,8 +88,8 @@ namespace SAFE.AppendOnlyDb.Network
                     break;
 
                 case MdType.Pointers:
-                    var indexMin = (ulong)Math.Truncate(min / Math.Pow(Constants.MdCapacity, Level));
-                    var indexMax = (ulong)Math.Truncate(max / Math.Pow(Constants.MdCapacity, Level));
+                    var indexMin = GetIndex(min);
+                    var indexMax = GetIndex(max);
                     var pointers = _dataOps.GetEntriesAsync<ulong, Pointer>(
                         k => ulong.Parse(k),
                         k => k >= indexMin && indexMax >= k)
@@ -148,7 +144,7 @@ namespace SAFE.AppendOnlyDb.Network
                 case MdType.Values:
                     return await GetValueAsync(version).ConfigureAwait(false);
                 case MdType.Pointers:
-                    var index = (ulong)Math.Truncate(version / Math.Pow(Constants.MdCapacity, Level));
+                    var index = (ulong)Math.Truncate(version / Math.Pow(Capacity, Level));
 
                     var pointer = await GetPointerAsync(index.ToString()).ConfigureAwait(false);
                     if (!pointer.HasValue)
@@ -177,5 +173,6 @@ namespace SAFE.AppendOnlyDb.Network
         }
 
         Task<Result<T>> TaskFrom<T>(Result<T> res) => Task.FromResult(res);
+        ulong GetIndex(ulong version) => (ulong)Math.Truncate(version / Math.Pow(Capacity, Level));
     }
 }

@@ -10,9 +10,7 @@ namespace SAFE.AppendOnlyDb
         readonly MutableCollection<StreamType> _collection;
 
         public StreamStore(IValueAD dataTree)
-        {
-            _collection = new MutableCollection<StreamType>(dataTree);
-        }
+            => _collection = new MutableCollection<StreamType>(dataTree);
 
         public async Task<Result<Pointer>> AddAsync(string type, MdLocator location)
         {

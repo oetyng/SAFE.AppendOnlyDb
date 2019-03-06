@@ -8,25 +8,18 @@ namespace SAFE.Data
 {
     internal static class Result
     {
-        public static Result<T> OK<T>(T value)
-        {
-            return new Result<T>(value, true);
-        }
+        public static Result<T> OK<T>(T value) 
+            => new Result<T>(value, true);
 
         public static Result<T> Fail<T>(int errorCode, string errorMsg)
-        {
-            return new Result<T>(default, false, errorCode, errorMsg);
-        }
+            => new Result<T>(default, false, errorCode, errorMsg);
     }
 
     public class Result<T>
     {
         public bool HasValue { get; private set; }
-
         public string ErrorMsg { get; }
-
         public int? ErrorCode { get; }
-
         public T Value { get; private set; }
 
         internal Result(T value, bool hasValue, int? errorCode = null, string errorMsg = "")

@@ -71,10 +71,10 @@ namespace SAFE.AppendOnlyDb.Network
 
             // get ImD
             var val = await GetImD(map);
-
             return (val.ToUtfString(), mdRef.Item2);
         }
 
+        // Todo: evaluate if this should fetch entries instead, internally, and filter out the 2 reserved fields
         public async IAsyncEnumerable<T> GetValuesAsync<T>()
         {
             using (var entriesHandle = await Session.MDataEntries.GetHandleAsync(_mdInfo).ConfigureAwait(false))
@@ -86,8 +86,6 @@ namespace SAFE.AppendOnlyDb.Network
                     // protects against deleted entries
                     if (entry.Value.Content.Count != 0)
                     {
-                        if (entry.Value.Content.Count < 50) // protects against the zero index 0 or 1 value.
-                            continue;
                         var decryptedValue = await Session.MDataInfoActions.DecryptAsync(_mdInfo, entry.Value.Content).ConfigureAwait(false);
                         var data = await GetImD(decryptedValue);
                         if (data.ToUtfString().TryParse(out T result))
@@ -106,7 +104,7 @@ namespace SAFE.AppendOnlyDb.Network
             {
                 // Fetch and decrypt entries
                 var encryptedEntries = await Session.MData.ListEntriesAsync(entriesHandle).ConfigureAwait(false);
-                //Parallel.ForEach(encryptedEntries, entry =>
+                
                 foreach (var entry in encryptedEntries)
                 {
                     // protects against deleted entries // should not be valid operation on append only though

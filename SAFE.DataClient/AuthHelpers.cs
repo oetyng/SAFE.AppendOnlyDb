@@ -14,9 +14,7 @@ namespace SAFE.Data.Client.Auth
     public class AuthConfig
     {
         public static void WinDesktopUseBrowserAuth(AppInfo appInfo, string appPath)
-        {
-            AuthHelpers.RegisterAppProtocol(appInfo, appPath);
-        }
+            => AuthHelpers.RegisterAppProtocol(appInfo, appPath);
     }
 
     internal static class AuthHelpers
@@ -29,9 +27,7 @@ namespace SAFE.Data.Client.Auth
         }
 
         public static string GetRequestData(string url)
-        {
-            return new Uri(url).PathAndQuery.Replace("/", string.Empty);
-        }
+            => new Uri(url).PathAndQuery.Replace("/", string.Empty);
 
         // Generating encoded app request using appname, appid, vendor
         public static async Task<(uint, string)> GenerateEncodedAppRequestAsync(AppInfo appInfo)

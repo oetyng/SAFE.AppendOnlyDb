@@ -16,13 +16,8 @@ namespace SAFE.AppendOnlyDb
         }
 
         public string Payload { get; set; }
-
         public string ValueType { get; set; }
 
-        public T Parse<T>()
-        {
-            //return Payload.Parse<T>();
-            return (T)Payload.Parse(ValueType);
-        }
+        public T Parse<T>() => (T)Payload.Parse(ValueType);
     }
 }

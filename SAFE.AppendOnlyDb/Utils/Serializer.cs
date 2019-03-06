@@ -7,6 +7,7 @@ namespace SAFE.AppendOnlyDb.Utils
     public static class Serializer
     {
         public static JsonSerializerSettings SerializerSettings;
+
         static Serializer()
         {
             SerializerSettings = new JsonSerializerSettings
@@ -26,6 +27,12 @@ namespace SAFE.AppendOnlyDb.Utils
             JsonConvert.DefaultSettings = () => SerializerSettings;
         }
 
+        public static string Json(this object data)
+            => JsonConvert.SerializeObject(data, SerializerSettings);
+
+        public static T Parse<T>(this string json)
+            => JsonConvert.DeserializeObject<T>(json, SerializerSettings);
+
         public static bool TryParse<T>(this string json, out T result)
         {
             try
@@ -38,11 +45,6 @@ namespace SAFE.AppendOnlyDb.Utils
                 result = default;
                 return false;
             }
-        }
-
-        public static T Parse<T>(this string json)
-        {
-            return JsonConvert.DeserializeObject<T>(json, SerializerSettings);
         }
 
         public static object Parse(this string json, string typeName)
@@ -58,11 +60,6 @@ namespace SAFE.AppendOnlyDb.Utils
             }
             
             return JsonConvert.DeserializeObject(json, type, SerializerSettings); // //JsonConvert.DefaultSettings = () => SerializerSettings;
-        }
-
-        public static string Json(this object data)
-        {
-            return JsonConvert.SerializeObject(data, SerializerSettings);
         }
     }
 }

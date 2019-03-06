@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -97,7 +96,6 @@ namespace SAFE.AppendOnlyDb.Network
                     break;
                 case MdType.Values:
                     var keys = EnumerableExt.LongRange(StartIndex, (ulong)Count);
-                    var pairs = new ConcurrentDictionary<ulong, StoredValue>();
                     foreach (var key in keys)
                     {
                         var val = await GetValueAsync(key).ConfigureAwait(false);
@@ -166,11 +164,8 @@ namespace SAFE.AppendOnlyDb.Network
             }
         }
 
-        Task<Result<Pointer>> GetLastPointer()
-        {
-            var pointer = GetPointerAsync((Count - 1).ToString());
-            return pointer;
-        }
+        Task<Result<Pointer>> GetLastPointer() 
+            => GetPointerAsync((Count - 1).ToString());
 
         async Task<Result<Pointer>> GetPointerAsync(string key)
         {
@@ -198,7 +193,6 @@ namespace SAFE.AppendOnlyDb.Network
             }
         }
 
-        // Added for conversion
         async IAsyncEnumerable<Pointer> GetAllPointersAsync()
         {
             switch (Type)

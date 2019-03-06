@@ -17,9 +17,7 @@ namespace SAFE.Data.Client
         }
 
         public static void SetFactory(Func<SafeApp.Session, string, string, Task<object>> factory)
-        {
-            _factory = factory;
-        }
+            => _factory = factory;
 
         public async Task<T> GetOrAddDbAsync<T>(string dbId)
         {

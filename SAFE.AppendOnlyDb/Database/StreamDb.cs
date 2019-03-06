@@ -36,6 +36,25 @@ namespace SAFE.AppendOnlyDb
             return Result.OK((IStreamDb)db);
         }
 
+        public async Task<Result<IStreamAD>> GetOrAddStreamAsync(string streamKey)
+        {
+            try
+            {
+                if (!_dataTreeAddresses.ContainsKey(streamKey))
+                {
+                    await AddStoreAsync(streamKey).ConfigureAwait(false);
+                    await LoadStoreAsync(streamKey).ConfigureAwait(false);
+                }
+                if (!_dataTreeCache.ContainsKey(streamKey))
+                    await LoadStoreAsync(streamKey).ConfigureAwait(false);
+                return Result.OK(_dataTreeCache[streamKey]);
+            }
+            catch (Exception ex)
+            {
+                return Result.Fail<IStreamAD>(-999, ex.Message);
+            }
+        }
+
         public async Task<Result<IStreamAD>> GetStreamAsync(string streamKey)
         {
             if (!_dataTreeAddresses.ContainsKey(streamKey))

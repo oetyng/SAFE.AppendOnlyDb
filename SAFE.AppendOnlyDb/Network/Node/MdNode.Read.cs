@@ -28,12 +28,7 @@ namespace SAFE.AppendOnlyDb.Network
                         return new ArgumentOutOfRange<StoredValue>(nameof(Type));
                 }
             }
-            catch (FfiException ex)
-            {
-                if (ex.ErrorCode != -106)
-                    throw;
-                return new KeyNotFound<StoredValue>($"Key: {version}.");
-            }
+            catch (FfiException ex) when (ex.ErrorCode == -106) { return new KeyNotFound<StoredValue>($"Key: {version}."); }
         }
 
         public async Task<Result<(Pointer, StoredValue)>> GetPointerAndValueAsync(ulong version)
@@ -47,7 +42,7 @@ namespace SAFE.AppendOnlyDb.Network
                     {
                         var valueResult = await GetValueAsync(version).ConfigureAwait(false);
                         if (!valueResult.HasValue)
-                            return Result.Fail<(Pointer, StoredValue)>(valueResult.ErrorCode.Value, valueResult.ErrorMsg);
+                            return valueResult.CastError<StoredValue, (Pointer, StoredValue)>();
                         var value = valueResult.Value;
                         return Result.OK((new Pointer
                         {
@@ -118,7 +113,7 @@ namespace SAFE.AppendOnlyDb.Network
         {
             var lastNode = await GetLastNode();
             if (!lastNode.HasValue)
-                return Result.Fail<StoredValue>((int)lastNode.ErrorCode, lastNode.ErrorMsg);
+                return lastNode.CastError<IMdNode, StoredValue>();
             if (lastNode.Value.Version is NoVersion && lastNode.Value.StartIndex == 0)
                 return new DataNotFound<StoredValue>("There is no data in the tree.");
             if (lastNode.Value.Count == 0)
@@ -147,16 +142,16 @@ namespace SAFE.AppendOnlyDb.Network
                         return Result.OK((IMdNode)this);
                     else
                     {
-                        var nextResult = await LocateAsync(Next, _dataOps.Session)
+                        var nextResult = await MdNodeFactory.LocateAsync(Next, _dataOps.Session)
                             .ConfigureAwait(false);
                         return await (nextResult.Value as MdNode).GetLastNode();
                     }
                 case MdType.Pointers:
                     var pointer = await GetLastPointer().ConfigureAwait(false);
                     if (!pointer.HasValue)
-                        return Result.Fail<IMdNode>(pointer.ErrorCode.Value, pointer.ErrorMsg);
+                        return pointer.CastError<Pointer, IMdNode>();
 
-                    var targetResult = await LocateAsync(pointer.Value.MdLocator, _dataOps.Session)
+                    var targetResult = await MdNodeFactory.LocateAsync(pointer.Value.MdLocator, _dataOps.Session)
                         .ConfigureAwait(false);
                     return await (targetResult.Value as MdNode).GetLastNode();
                 default:
@@ -185,12 +180,7 @@ namespace SAFE.AppendOnlyDb.Network
                         return new ArgumentOutOfRange<Pointer>(nameof(Type));
                 }
             }
-            catch (FfiException ex)
-            {
-                if (ex.ErrorCode != -106)
-                    throw;
-                return new KeyNotFound<Pointer>($"Key: {key}.");
-            }
+            catch (FfiException ex) when (ex.ErrorCode == -106) { return new KeyNotFound<Pointer>($"Key: {key}."); }
         }
 
         async IAsyncEnumerable<Pointer> GetAllPointersAsync()

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,12 +8,13 @@ using SafeApp.Utilities;
 
 namespace SAFE.AppendOnlyDb.Network
 {
-    internal class MdDataOps
+    internal class MdDataOps : IMdDataOps
     {
         readonly MDataInfo _mdInfo;
         readonly INetworkDataOps _networkDataOps;
 
         public Session Session { get; set; }
+        public MdLocator MdLocator => new MdLocator(_mdInfo.Name, _mdInfo.TypeTag, _mdInfo.EncKey, _mdInfo.EncNonce);
 
         public MdDataOps(Session session, MDataInfo mdInfo)
         {
@@ -104,7 +104,7 @@ namespace SAFE.AppendOnlyDb.Network
             {
                 // Fetch and decrypt entries
                 var encryptedEntries = await Session.MData.ListEntriesAsync(entriesHandle).ConfigureAwait(false);
-                
+
                 foreach (var entry in encryptedEntries)
                 {
                     // protects against deleted entries // should not be valid operation on append only though
@@ -127,35 +127,6 @@ namespace SAFE.AppendOnlyDb.Network
                     }
                 }
             }
-        }
-
-        [Obsolete]
-        public async Task<List<MDataEntry>> GetEntriesAsync()
-        {
-            var entries = new ConcurrentBag<MDataEntry>();
-
-            using (var entriesHandle = await Session.MDataEntries.GetHandleAsync(_mdInfo).ConfigureAwait(false))
-            {
-                // Fetch and decrypt entries
-                var encryptedEntries = await Session.MData.ListEntriesAsync(entriesHandle).ConfigureAwait(false);
-                Parallel.ForEach(encryptedEntries, entry =>
-                {
-                    if (entry.Value.Content.Count != 0)
-                    {
-                        var decryptedKey = Session.MDataInfoActions.DecryptAsync(_mdInfo, entry.Key.Key).GetAwaiter().GetResult();
-                        var decryptedValue = Session.MDataInfoActions.DecryptAsync(_mdInfo, entry.Value.Content).GetAwaiter().GetResult();
-                        entries.Add(new MDataEntry()
-                        {
-                            Key = new MDataKey() { Key = decryptedKey },
-                            Value = new MDataValue { Content = decryptedValue, EntryVersion = entry.Value.EntryVersion }
-                        });
-                    }
-                });
-            }
-
-            // get ImD? or hide this from API
-
-            return entries.ToList();
         }
 
         public async Task AddObjectAsync(string key, object value)

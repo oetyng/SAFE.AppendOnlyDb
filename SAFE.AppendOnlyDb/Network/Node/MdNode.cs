@@ -1,14 +1,11 @@
 ﻿using System;
 using System.Threading.Tasks;
-using SafeApp;
-using SafeApp.Utilities;
 
 namespace SAFE.AppendOnlyDb.Network
 {
     internal sealed partial class MdNode : IMdNode
     {
-        readonly MDataInfo _mdInfo;
-        readonly MdDataOps _dataOps;
+        readonly IMdDataOps _dataOps;
         MdMetadata _metadata;
         int _count;
 
@@ -25,14 +22,10 @@ namespace SAFE.AppendOnlyDb.Network
 
         public int Level => _metadata.Level;
         public MdType Type => Level > 0 ? MdType.Pointers : MdType.Values;
-        public MdLocator MdLocator => new MdLocator(_mdInfo.Name, _mdInfo.TypeTag, _mdInfo.EncKey, _mdInfo.EncNonce);
+        public MdLocator MdLocator => _dataOps.MdLocator;
         public ExpectedVersion Version => Count == 0 ? ExpectedVersion.None : ExpectedVersion.Specific(NextVersion - 1);
 
-        public MdNode(MDataInfo mdInfo, Session session)
-        {
-            _mdInfo = mdInfo;
-            _dataOps = new MdDataOps(session, mdInfo);
-        }
+        public MdNode(IMdDataOps dataOps) => _dataOps = dataOps;
 
         public Task Initialize(MdMetadata metadata) => GetOrAddMetadata(metadata);
     }

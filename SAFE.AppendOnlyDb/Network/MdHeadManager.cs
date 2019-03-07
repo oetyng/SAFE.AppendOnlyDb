@@ -48,9 +48,7 @@ namespace SAFE.AppendOnlyDb.Network
                 }
             }
             else
-            {
                 await LoadDbContainer();
-            }
         }
 
         public async Task<MdHead> GetOrAddHeadAsync(string mdName)
@@ -101,10 +99,10 @@ namespace SAFE.AppendOnlyDb.Network
         }
 
         public Task<IMdNode> CreateNewMdNode(MdMetadata meta, ulong protocol) 
-            => MdNode.CreateNewMdNodeAsync(meta, _dataOps.Session, protocol);
+            => MdNodeFactory.CreateNewMdNodeAsync(meta, _dataOps.Session, protocol);
 
         public Task<Result<IMdNode>> LocateMdNode(MdLocator location) 
-            => MdNode.LocateAsync(location, _dataOps.Session);
+            => MdNodeFactory.LocateAsync(location, _dataOps.Session);
 
         async Task<bool> ExistsManagerAsync()
         {

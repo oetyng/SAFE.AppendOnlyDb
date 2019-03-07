@@ -34,7 +34,7 @@ namespace SAFE.AppendOnlyDb.Network
                         var pointer = await GetLastPointer().ConfigureAwait(false);
                         if (!pointer.HasValue) return pointer;
 
-                        var targetResult = await LocateAsync(pointer.Value.MdLocator, _dataOps.Session).ConfigureAwait(false);
+                        var targetResult = await MdNodeFactory.LocateAsync(pointer.Value.MdLocator, _dataOps.Session).ConfigureAwait(false);
                         if (!targetResult.HasValue)
                             return targetResult.CastError<IMdNode, Pointer>();
                         var target = targetResult.Value;
@@ -49,7 +49,7 @@ namespace SAFE.AppendOnlyDb.Network
                     if (Previous == null)  // (if null Previous, this would be the very first, still empty, MdNode in the tree)
                         return await ExpandLevelAsync(value, expectedVersion, previous: default).ConfigureAwait(false);
 
-                    var prevNode = await LocateAsync(Previous, _dataOps.Session).ConfigureAwait(false);
+                    var prevNode = await MdNodeFactory.LocateAsync(Previous, _dataOps.Session).ConfigureAwait(false);
                     if (!prevNode.HasValue)
                         return prevNode.CastError<IMdNode, Pointer>();
 
@@ -57,7 +57,7 @@ namespace SAFE.AppendOnlyDb.Network
                     if (!lastPointerOfPrevNode.HasValue)
                         return lastPointerOfPrevNode;
 
-                    var prevNodeForNewNode = await LocateAsync(lastPointerOfPrevNode.Value.MdLocator, _dataOps.Session).ConfigureAwait(false);
+                    var prevNodeForNewNode = await MdNodeFactory.LocateAsync(lastPointerOfPrevNode.Value.MdLocator, _dataOps.Session).ConfigureAwait(false);
                     if (!prevNodeForNewNode.HasValue)
                         return prevNodeForNewNode.CastError<IMdNode, Pointer>();
 
@@ -204,7 +204,7 @@ namespace SAFE.AppendOnlyDb.Network
         }
 
         Task<IMdNode> CreateNewMdNode(MdMetadata meta)
-            => CreateNewMdNodeAsync(meta, _dataOps.Session, DataProtocol.DEFAULT_AD_PROTOCOL);
+            => MdNodeFactory.CreateNewMdNodeAsync(meta, _dataOps.Session, DataProtocol.DEFAULT_AD_PROTOCOL);
 
         async Task<Result<Pointer>> ExpandLevelAsync(StoredValue value, ExpectedVersion expectedVersion, IMdNode previous)
         {

@@ -115,14 +115,14 @@ namespace SAFE.AppendOnlyDb.Network
         async IAsyncEnumerable<Result<IMdNode>> LocateMany(IAsyncEnumerable<MdLocator> locators)
         {
             await foreach (var locator in locators)
-                yield return await LocateAsync(locator, _dataOps.Session);
+                yield return await MdNodeFactory.LocateAsync(locator, _dataOps.Session);
         }
 
         async IAsyncEnumerable<(ulong, StoredValue)> FindRangeInNextAsync(ulong min, ulong max)
         {
             if (Next != null)
             {
-                var targetResult = await LocateAsync(Next, _dataOps.Session)
+                var targetResult = await MdNodeFactory.LocateAsync(Next, _dataOps.Session)
                     .ConfigureAwait(false);
                 var range = targetResult.Value.FindRangeAsync(min, max).ConfigureAwait(false);
                 await foreach (var item in range)
@@ -132,7 +132,7 @@ namespace SAFE.AppendOnlyDb.Network
 
         async IAsyncEnumerable<(ulong, StoredValue)> FindRangeInPreviousAsync(ulong min, ulong max)
         {
-            var targetResult = await LocateAsync(Previous, _dataOps.Session)
+            var targetResult = await MdNodeFactory.LocateAsync(Previous, _dataOps.Session)
                 .ConfigureAwait(false);
             var range = targetResult.Value.FindRangeAsync(min, max).ConfigureAwait(false);
             await foreach (var item in range)
@@ -149,9 +149,9 @@ namespace SAFE.AppendOnlyDb.Network
                     var index = GetIndex(version);
                     var pointer = await GetPointerAsync(index.ToString()).ConfigureAwait(false);
                     if (!pointer.HasValue)
-                        return Result.Fail<StoredValue>(pointer.ErrorCode.Value, pointer.ErrorMsg);
+                        return pointer.CastError<Pointer, StoredValue>();
 
-                    var targetResult = await LocateAsync(pointer.Value.MdLocator, _dataOps.Session)
+                    var targetResult = await MdNodeFactory.LocateAsync(pointer.Value.MdLocator, _dataOps.Session)
                         .ConfigureAwait(false);
                     return await targetResult.Value.FindAsync(version).ConfigureAwait(false);
                 default:
@@ -161,14 +161,14 @@ namespace SAFE.AppendOnlyDb.Network
 
         async Task<Result<StoredValue>> FindInNextAsync(ulong version)
         {
-            var targetResult = await LocateAsync(Next, _dataOps.Session)
+            var targetResult = await MdNodeFactory.LocateAsync(Next, _dataOps.Session)
                 .ConfigureAwait(false);
             return await targetResult.Value.FindAsync(version).ConfigureAwait(false);
         }
 
         async Task<Result<StoredValue>> FindInPreviousAsync(ulong version)
         {
-            var targetResult = await LocateAsync(Previous, _dataOps.Session)
+            var targetResult = await MdNodeFactory.LocateAsync(Previous, _dataOps.Session)
                 .ConfigureAwait(false);
             return await targetResult.Value.FindAsync(version).ConfigureAwait(false);
         }

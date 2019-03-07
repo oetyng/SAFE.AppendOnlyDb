@@ -4,7 +4,7 @@ using SafeApp;
 
 namespace SAFE.AppendOnlyDb.Network
 {
-    internal sealed partial class MdNode
+    internal sealed class MdNodeFactory
     {
         public static async Task<Result<IMdNode>> LocateAsync(MdLocator location, Session session)
         {
@@ -17,8 +17,9 @@ namespace SAFE.AppendOnlyDb.Network
                 return new KeyNotFound<IMdNode>($"Could not locate md: {location.TypeTag}, {location.XORName}");
 
             var mdInfo = mdResult.Value;
-            var md = new MdNode(mdInfo, networkDataOps.Session);
-            await md.GetOrAddMetadata().ConfigureAwait(false);
+            var dataOps = new MdDataOps(networkDataOps.Session, mdInfo);
+            var md = new MdNode(dataOps);
+            await md.Initialize(metadata: null).ConfigureAwait(false);
             return Result.OK((IMdNode)md);
         }
 
@@ -26,7 +27,8 @@ namespace SAFE.AppendOnlyDb.Network
         {
             var networkDataOps = new NetworkDataOps(session);
             var mdInfo = await networkDataOps.CreateEmptyMd(protocol).ConfigureAwait(false);
-            var newMd = new MdNode(mdInfo, session);
+            var dataOps = new MdDataOps(session, mdInfo);
+            var newMd = new MdNode(dataOps);
             await newMd.Initialize(metadata).ConfigureAwait(false);
             return newMd;
         }

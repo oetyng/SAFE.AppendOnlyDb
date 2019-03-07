@@ -105,12 +105,12 @@ namespace SAFE.AppendOnlyDb.Tests
             Assert.IsNotNull(result_1);
             Assert.IsInstanceOfType(result_1, typeof(Result<bool>));
             Assert.IsTrue(result_1.HasValue);
-            Assert.IsTrue(result_1.Value);
+            Assert.IsTrue(result_1.Value); // <- Added: true
 
             Assert.IsNotNull(result_2);
             Assert.IsInstanceOfType(result_2, typeof(Result<bool>));
             Assert.IsTrue(result_2.HasValue);
-            Assert.IsFalse(result_2.Value);
+            Assert.IsFalse(result_2.Value); // <- Added: false
         }
     }
 }

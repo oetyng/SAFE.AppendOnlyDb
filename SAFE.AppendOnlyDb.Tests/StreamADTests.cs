@@ -18,8 +18,6 @@ namespace SAFE.AppendOnlyDb.Tests
             var db = await GetDatabase("theDb");
             await db.AddStreamAsync(streamKey);
             return (await db.GetStreamAsync(streamKey)).Value;
-            //var mdHead = await MdAccess.CreateAsync();
-            //return new DataTree(mdHead, (s) => throw new ArgumentOutOfRangeException("Can only add 1k items to this collection."));
         }
 
         [TestMethod]
@@ -36,139 +34,6 @@ namespace SAFE.AppendOnlyDb.Tests
             Assert.IsNotNull(addResult);
             Assert.IsInstanceOfType(addResult, typeof(Result<Pointer>));
             Assert.IsTrue(addResult.HasValue);
-        }
-
-        [TestMethod]
-        public async Task GetAtVersionAsync_returns_stored_value()
-        {
-            // Arrange
-            var stream = await GetStreamADAsync();
-            var theData = "theData";
-            _ = await stream.AppendAsync(new StoredValue(theData)).ConfigureAwait(false);
-
-            // Act
-            var findResult = await stream.GetAtVersionAsync(0).ConfigureAwait(false);
-
-            // Assert
-            Assert.IsNotNull(findResult);
-            Assert.IsInstanceOfType(findResult, typeof(Result<StoredValue>));
-            Assert.IsTrue(findResult.HasValue);
-            Assert.AreEqual(theData, findResult.Value.Parse<string>());
-        }
-
-        [TestMethod]
-        public async Task StreamDb_adds_more_than_md_capacity()
-        {
-            // Arrange
-            var stream = await GetStreamADAsync();
-
-            var addCount = Math.Round(1.3 * Constants.MdCapacity);
-            var sw = new Stopwatch();
-
-            for (int i = 0; i < addCount; i++)
-            {
-                var theData = new StoredValue(i);
-
-                // Act
-                sw.Restart();
-                var addResult = await stream.AppendAsync(theData).ConfigureAwait(false);
-                sw.Stop();
-
-                // Assert 1
-                Assert.IsNotNull(addResult);
-                Assert.IsInstanceOfType(addResult, typeof(Result<Pointer>));
-                Assert.IsTrue(addResult.HasValue);
-                Debug.WriteLine($"{i}: {sw.ElapsedMilliseconds}");
-            }
-
-            // Assert 2
-            var events = await stream.ReadForwardFromAsync(0).ToListAsync();
-            Assert.IsNotNull(events);
-            Assert.AreEqual(addCount, events.Count);
-        }
-
-        [TestMethod]
-        public async Task StreamDb_reads_ordered_forwards_and_backwards()
-        {
-            // Arrange
-            var stream = await GetStreamADAsync();
-
-            var addCount = Math.Round(1.3 * Constants.MdCapacity);
-            var sw = new Stopwatch();
-
-            // Act
-            await Task.WhenAll(Enumerable.Range(0, (int)addCount)
-                .Select(c => stream.AppendAsync(new StoredValue(c)))).ConfigureAwait(false);
-
-            // Assert 1
-            var forwardEvents = await stream.ReadForwardFromAsync(0).ToListAsync();
-            Assert.IsNotNull(forwardEvents);
-            Assert.AreEqual(addCount, forwardEvents.Count);
-            var fwdVersions = forwardEvents.Select(c => c.Item1);
-            var fwdValues = forwardEvents.Select(c => c.Item2.Parse<int>());
-            Assert.IsTrue(Enumerable.SequenceEqual(fwdVersions, Utils.EnumerableExt.LongRange(0, (ulong)addCount)));
-            Assert.IsTrue(Enumerable.SequenceEqual(fwdValues, Enumerable.Range(0, (int)addCount)));
-
-            // Assert 2
-            var backwardEvents = await stream.ReadBackwardsFromAsync((ulong)addCount - 1).ToListAsync();
-            Assert.IsNotNull(backwardEvents);
-            Assert.AreEqual(addCount, backwardEvents.Count);
-
-            var bwdVersions = backwardEvents.Select(c => c.Item1).ToList();
-            var bwdValues = backwardEvents.Select(c => c.Item2.Parse<int>()).ToList();
-            var reverseInt32AddRange = Enumerable.Range(0, (int)addCount).Reverse().ToList(); // <- Reverse
-            var reverseUInt64AddRange = reverseInt32AddRange.Select(c => (ulong)c).ToList();
-
-            Assert.AreEqual(reverseInt32AddRange.Count, reverseUInt64AddRange.Count);
-            Assert.IsTrue(Enumerable.SequenceEqual(bwdValues, reverseInt32AddRange));
-            Assert.IsTrue(Enumerable.SequenceEqual(bwdVersions, reverseUInt64AddRange));
-        }
-
-        [TestMethod]
-        public async Task GetRangeAsync_returns_expected_range()
-        {
-            // Arrange
-            var stream = await GetStreamADAsync();
-
-            ulong indexStart = 54;
-            ulong selectCount = 367;
-            var added = Enumerable.Range(0, 500);
-            foreach (var item in added)
-                await stream.AppendAsync(new StoredValue(item));
-
-            // Act
-            var range = await stream.GetRangeAsync(indexStart, indexStart + selectCount - 1)
-                .Select(c => c.Item1)
-                .OrderBy(c => c)
-                .ToListAsync();
-
-            // Assert
-            Assert.IsTrue(Enumerable.SequenceEqual(range, Utils.EnumerableExt.LongRange(indexStart, selectCount)));
-        }
-
-        [TestMethod]
-        public async Task GetAtVersionAsync_returns_correct_value()
-        {
-            // Arrange
-            var stream = await GetStreamADAsync();
-
-            var firstValue = "firstValue";
-            var middleValue = "middleValue"; // <= Expected value
-            var lastValue = "lastValue";
-            await stream.AppendAsync(new StoredValue(firstValue)); // version 0
-            await stream.AppendAsync(new StoredValue(middleValue)); // version 1 <= Pick this one
-            await stream.AppendAsync(new StoredValue(lastValue)); // version 2
-
-            var middleVersion = ExpectedVersion.Specific(1);
-
-            // Act
-            var result = await stream.GetAtVersionAsync((ulong)middleVersion.Value);
-
-            // Assert 2
-            Assert.IsNotNull(result);
-            Assert.IsTrue(result.HasValue);
-            Assert.IsInstanceOfType(result, typeof(Result<StoredValue>));
-            Assert.AreEqual(middleValue, result.Value.Parse<string>());
         }
 
         [TestMethod]
@@ -238,6 +103,121 @@ namespace SAFE.AppendOnlyDb.Tests
 
             // Assert
             Assert.IsTrue(Enumerable.SequenceEqual(range, Utils.EnumerableExt.LongRange(indexStart, selectCount)));
+        }
+
+        [TestMethod]
+        public async Task GetAtVersionAsync_returns_correct_value()
+        {
+            // Arrange
+            var stream = await GetStreamADAsync();
+
+            var firstValue = "firstValue";
+            var middleValue = "middleValue"; // <= Expected value
+            var lastValue = "lastValue";
+            await stream.AppendAsync(new StoredValue(firstValue)); // version 0
+            await stream.AppendAsync(new StoredValue(middleValue)); // version 1 <= Pick this one
+            await stream.AppendAsync(new StoredValue(lastValue)); // version 2
+
+            var middleVersion = ExpectedVersion.Specific(1);
+
+            // Act
+            var result = await stream.GetAtVersionAsync((ulong)middleVersion.Value);
+
+            // Assert 2
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.HasValue);
+            Assert.IsInstanceOfType(result, typeof(Result<StoredValue>));
+            Assert.AreEqual(middleValue, result.Value.Parse<string>());
+        }
+
+        [TestMethod]
+        public async Task GetRangeAsync_returns_expected_range()
+        {
+            // Arrange
+            var stream = await GetStreamADAsync();
+
+            ulong indexStart = 54;
+            ulong selectCount = 367;
+            var added = Enumerable.Range(0, 500);
+            foreach (var item in added)
+                await stream.AppendAsync(new StoredValue(item));
+
+            // Act
+            var range = await stream.GetRangeAsync(indexStart, indexStart + selectCount - 1)
+                .Select(c => c.Item1)
+                .OrderBy(c => c)
+                .ToListAsync();
+
+            // Assert
+            Assert.IsTrue(Enumerable.SequenceEqual(range, Utils.EnumerableExt.LongRange(indexStart, selectCount)));
+        }
+
+        [TestMethod]
+        public async Task StreamDb_adds_more_than_md_capacity()
+        {
+            // Arrange
+            var stream = await GetStreamADAsync();
+
+            var addCount = Math.Round(1.3 * Constants.MdCapacity);
+            var sw = new Stopwatch();
+
+            for (int i = 0; i < addCount; i++)
+            {
+                var theData = new StoredValue(i);
+
+                // Act
+                sw.Restart();
+                var addResult = await stream.AppendAsync(theData).ConfigureAwait(false);
+                sw.Stop();
+
+                // Assert 1
+                Assert.IsNotNull(addResult);
+                Assert.IsInstanceOfType(addResult, typeof(Result<Pointer>));
+                Assert.IsTrue(addResult.HasValue);
+                Debug.WriteLine($"{i}: {sw.ElapsedMilliseconds}");
+            }
+
+            // Assert 2
+            var events = await stream.ReadForwardFromAsync(0).ToListAsync();
+            Assert.IsNotNull(events);
+            Assert.AreEqual(addCount, events.Count);
+        }
+
+        [TestMethod]
+        public async Task StreamDb_reads_ordered_forwards_and_backwards()
+        {
+            // Arrange
+            var stream = await GetStreamADAsync();
+
+            var addCount = Math.Round(1.3 * Constants.MdCapacity);
+            var sw = new Stopwatch();
+
+            // Act
+            await Task.WhenAll(Enumerable.Range(0, (int)addCount)
+                .Select(c => stream.AppendAsync(new StoredValue(c)))).ConfigureAwait(false);
+
+            // Assert 1: Forward
+            var forwardEvents = await stream.ReadForwardFromAsync(0).ToListAsync();
+            Assert.IsNotNull(forwardEvents);
+            Assert.AreEqual(addCount, forwardEvents.Count);
+            var fwdVersions = forwardEvents.Select(c => c.Item1);
+            var fwdValues = forwardEvents.Select(c => c.Item2.Parse<int>());
+            Assert.IsTrue(Enumerable.SequenceEqual(fwdVersions, Utils.EnumerableExt.LongRange(0, (ulong)addCount)));
+            Assert.IsTrue(Enumerable.SequenceEqual(fwdValues, Enumerable.Range(0, (int)addCount)));
+
+            // Assert 2: Backwards
+            var backwardEvents = await stream.ReadBackwardsFromAsync((ulong)addCount - 1).ToListAsync();
+            Assert.IsNotNull(backwardEvents);
+            Assert.AreEqual(addCount, backwardEvents.Count);
+
+            var bwdVersions = backwardEvents.Select(c => c.Item1).ToList();
+            var bwdValues = backwardEvents.Select(c => c.Item2.Parse<int>()).ToList();
+            var reverseInt32AddRange = Enumerable.Range(0, (int)addCount).Reverse().ToList(); // <- Reverse
+            var reverseUInt64AddRange = reverseInt32AddRange.Select(c => (ulong)c).ToList();
+
+            Assert.AreEqual(reverseInt32AddRange.Count, reverseUInt64AddRange.Count);
+            Assert.IsTrue(Enumerable.SequenceEqual(bwdValues, reverseInt32AddRange));
+            Assert.IsTrue(Enumerable.SequenceEqual(bwdVersions, reverseUInt64AddRange));
         }
     }
 }

@@ -10,6 +10,8 @@ namespace SAFE.AppendOnlyDb
         Task<Result<Pointer>> AppendAsync(StoredValue value);
         Task<Result<Pointer>> TryAppendAsync(StoredValue value, ExpectedVersion expectedVersion);
 
+        // Todo: AppendRange / TryAppendRange
+
         Task<Result<StoredValue>> GetAtVersionAsync(ulong version);
 
         IOrderedAsyncEnumerable<(ulong, StoredValue)> ReadForwardFromAsync(ulong from);

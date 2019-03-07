@@ -204,7 +204,7 @@ namespace SAFE.AppendOnlyDb.Network
         }
 
         Task<IMdNode> CreateNewMdNode(MdMetadata meta)
-            => CreateNewMdNodeAsync(meta, _dataOps.Session, DataProtocol.DEFAULT_PROTOCOL);
+            => CreateNewMdNodeAsync(meta, _dataOps.Session, DataProtocol.DEFAULT_AD_PROTOCOL);
 
         async Task<Result<Pointer>> ExpandLevelAsync(StoredValue value, ExpectedVersion expectedVersion, IMdNode previous)
         {

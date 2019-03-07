@@ -17,7 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SAFE.AppendOnlyDb\SAFE.AppendOnlyDb.csproj" />
-    <ProjectReference Include="..\SAFE.DataClient\SAFE.DataClient.csproj" />
+    <ProjectReference Include="..\SAFE.AuthClient\SAFE.AuthClient.csproj" />
   </ItemGroup>
 
 </Project>

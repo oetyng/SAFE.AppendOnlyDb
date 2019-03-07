@@ -8,10 +8,10 @@ namespace SAFE.AppendOnlyDb.Factories
     {
         public static async Task<Result<IStreamDb>> CreateForApp(SafeApp.Session session, string appId, string dbId)
         {
-            var manager = new MdHeadManager(session, appId, DataProtocol.DEFAULT_PROTOCOL);
+            var manager = new MdHeadManager(session, appId, DataProtocol.DEFAULT_AD_PROTOCOL);
             await manager.InitializeManager();
 
-            MdAccess.SetCreator((meta) => manager.CreateNewMdNode(meta, DataProtocol.DEFAULT_PROTOCOL));
+            MdAccess.SetCreator((meta) => manager.CreateNewMdNode(meta, DataProtocol.DEFAULT_AD_PROTOCOL));
             MdAccess.SetLocator(manager.LocateMdNode);
 
             var streamMdHead = await manager.GetOrAddHeadAsync(dbId);

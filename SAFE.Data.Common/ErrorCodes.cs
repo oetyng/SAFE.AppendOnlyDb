@@ -1,6 +1,6 @@
 ﻿namespace SAFE.Data
 {
-    internal static class ErrorCodes
+    public static class ErrorCodes
     {
         public const int KEY_NOT_FOUND = -1;
         public const int VALUE_DELETED = -2;

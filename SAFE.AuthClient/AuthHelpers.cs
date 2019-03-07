@@ -1,13 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Win32;
 using SafeApp;
 using SafeApp.Utilities;
-
-[assembly: InternalsVisibleTo("SAFE.AppendOnlyDb.Tests")]
 
 namespace SAFE.Data.Client.Auth
 {

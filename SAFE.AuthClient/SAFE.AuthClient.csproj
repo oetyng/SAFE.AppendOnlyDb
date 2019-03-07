@@ -5,6 +5,8 @@
     <LangVersion>latest</LangVersion>
     <DefineConstants>TRACE;SAFE_APP_MOCK</DefineConstants>
     <Platforms>AnyCPU;x64</Platforms>
+    <RootNamespace>SAFE.AuthClient</RootNamespace>
+    <AssemblyName>SAFE.AuthClient</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>

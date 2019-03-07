@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using SAFE.AppendOnlyDb.Utils;
 using SAFE.Data;
 using SafeApp.Utilities;
 
@@ -10,104 +11,91 @@ namespace SAFE.AppendOnlyDb.Network
 {
     internal sealed partial class MdNode
     {
-        // NOT THREAD SAFE
+        readonly AsyncDuplicateLock _writeLock = new AsyncDuplicateLock();
+
         // Adds if not exists
         // It will return the direct pointer to the stored value
         // which makes it readily available for indexing at higher levels.
         public Task<Result<Pointer>> AppendAsync(StoredValue value)
             => TryAppendAsync(value, ExpectedVersion.Any);
 
-        // NOT THREAD SAFE
         public async Task<Result<Pointer>> TryAppendAsync(StoredValue value, ExpectedVersion expectedVersion)
         {
-            if (IsFull)
-                return new MdOutOfEntriesError<Pointer>($"Filled: {Count}/{Constants.MdCapacity}");
-            
-            try
+            using (var synch = await _writeLock.LockAsync(_uniqueId))
             {
+                if (IsFull) return new MdOutOfEntriesError<Pointer>($"Filled: {Count}/{Constants.MdCapacity}");
+
                 switch (Type)
                 {
+                    case MdType.Values:
+                        var versionRes = ValidateVersion(expectedVersion);
+                        if (!versionRes.HasValue) // optimistic concurrency
+                            return new VersionMismatch<Pointer>(versionRes.ErrorMsg);
+                        return await AddObjectAsync($"{NextVersion}", value).ConfigureAwait(false);
+
                     case MdType.Pointers:
-                        if (Count == 0) // i.e. we must get last MdNode held by Previous for this node. (i.e. last node, one level down, of previous node on this level)
+                        if (Count > 0)
                         {
-                            IMdNode previous = default;
-                            if (Previous != null) // (if null Previous, this would be the very first, still empty, MdNode in the tree)
-                            {
-                                var prevNodeForThis = await LocateAsync(Previous, _dataOps.Session)
-                                    .ConfigureAwait(false);
-                                if (!prevNodeForThis.HasValue)
-                                    return Result.Fail<Pointer>(prevNodeForThis.ErrorCode.Value, prevNodeForThis.ErrorMsg);
-                                switch(prevNodeForThis.Value.Type)
-                                {
-                                    case MdType.Pointers:
-                                        var prevNodePointerForValue = await (prevNodeForThis.Value as MdNode).GetLastPointer();
-                                        if (!prevNodePointerForValue.HasValue)
-                                            return Result.Fail<Pointer>(prevNodePointerForValue.ErrorCode.Value, prevNodePointerForValue.ErrorMsg);
-                                        var prevNodeForValue = await LocateAsync(prevNodePointerForValue.Value.MdLocator, _dataOps.Session)
-                                            .ConfigureAwait(false);
-                                        if (!prevNodeForValue.HasValue)
-                                            return Result.Fail<Pointer>(prevNodeForValue.ErrorCode.Value, prevNodeForValue.ErrorMsg);
-                                        previous = prevNodeForValue.Value;
-                                        break;
-                                    case MdType.Values: // Previous of a Pointer type cannot be of Value type.
-                                    default:
-                                        return new ArgumentOutOfRange<Pointer>("prevNodeForThis.Value.Type");
-                                }
-                            }
-                            return await ExpandLevelAsync(value, expectedVersion, previous).ConfigureAwait(false);
+                            var pointer = await GetLastPointer().ConfigureAwait(false);
+                            if (!pointer.HasValue) return pointer;
+
+                            var targetResult = await LocateAsync(pointer.Value.MdLocator, _dataOps.Session).ConfigureAwait(false);
+                            if (!targetResult.HasValue)
+                                return Result.Fail<Pointer>(targetResult.ErrorCode.Value, targetResult.ErrorMsg);
+                            var target = targetResult.Value;
+                            if (target.IsFull)
+                                return await ExpandLevelAsync(value, expectedVersion, previous: target).ConfigureAwait(false);
+
+                            return await target.TryAppendAsync(value, expectedVersion).ConfigureAwait(false);
                         }
 
-                        var pointer = await GetLastPointer().ConfigureAwait(false);
-                        if (!pointer.HasValue)
-                            return pointer;
-
-                        var targetResult = await LocateAsync(pointer.Value.MdLocator, _dataOps.Session)
-                            .ConfigureAwait(false);
-                        if (!targetResult.HasValue)
-                            return Result.Fail<Pointer>(targetResult.ErrorCode.Value, targetResult.ErrorMsg);
-                        var target = targetResult.Value;
-                        if (target.IsFull)
-                            return await ExpandLevelAsync(value, expectedVersion, previous: target).ConfigureAwait(false);
-
-                        return await target.TryAppendAsync(value, expectedVersion).ConfigureAwait(false);
-                    case MdType.Values:
-                        // optimistic concurrency
-                        var versionRes = ValidateVersion(expectedVersion);
-                        if (!versionRes.HasValue) return new VersionMismatch<Pointer>(versionRes.ErrorMsg);
-
-                        var key = $"{NextVersion}";
-                        await AddObjectAsync(key, value).ConfigureAwait(false);
-
-                        return Result.OK(new Pointer // return pointer, to be used for indexing
+                        // Count == 0, i.e. we must get last MdNode held by Previous for this node. 
+                        // (i.e. last node, one level down, of previous node on this level)
+                        IMdNode previous = default;
+                        if (Previous != null) // (if null Previous, this would be the very first, still empty, MdNode in the tree)
                         {
-                            MdLocator = MdLocator,
-                            MdKey = key,
-                            ValueType = value.ValueType
-                        });
+                            var prevNodeForThis = await LocateAsync(Previous, _dataOps.Session).ConfigureAwait(false);
+                            if (!prevNodeForThis.HasValue) return Result.Fail<Pointer>(prevNodeForThis.ErrorCode.Value, prevNodeForThis.ErrorMsg);
+
+                            switch (prevNodeForThis.Value.Type)
+                            {
+                                case MdType.Pointers:
+                                    var prevNodePointerForValue = await (prevNodeForThis.Value as MdNode).GetLastPointer();
+                                    if (!prevNodePointerForValue.HasValue) return prevNodePointerForValue;
+
+                                    var prevNodeForValue = await LocateAsync(prevNodePointerForValue.Value.MdLocator, _dataOps.Session).ConfigureAwait(false);
+                                    if (!prevNodeForValue.HasValue) return Result.Fail<Pointer>(prevNodeForValue.ErrorCode.Value, prevNodeForValue.ErrorMsg);
+
+                                    previous = prevNodeForValue.Value;
+                                    break;
+                                case MdType.Values: // Previous of a Pointer type cannot be of Value type.
+                                default:
+                                    return new ArgumentOutOfRange<Pointer>("prevNodeForThis.Value.Type");
+                            }
+                        }
+                        return await ExpandLevelAsync(value, expectedVersion, previous).ConfigureAwait(false);
                     default:
                         return new ArgumentOutOfRange<Pointer>(nameof(Type));
                 }
-            }
-            catch (FfiException ex)
-            {
-                // will throw -108 if entry limit exceeded
-                if (ex.ErrorCode == -107)
-                    return new ValueAlreadyExists<Pointer>(ex.Message);
-                else
-                    throw;
             }
         }
 
         public async Task<Result<Pointer>> AddAsync(Pointer pointer)
         {
-            if (IsFull)
-                return new MdOutOfEntriesError<Pointer>($"Filled: {Count}/{Constants.MdCapacity}");
-            if (Type == MdType.Values)
-                return new InvalidOperation<Pointer>("Pointers can only be added in Pointer type Mds (i.e. Level > 0).");
-            var index = (Count).ToString();
-            pointer.MdKey = index;
-            await AddObjectAsync(index, pointer).ConfigureAwait(false);
-            return Result.OK(pointer);
+            // Since this is nested under lock of TryAppend, 
+            // we must distinguish it by appending "Pointer" to lock key.
+            // (That is OK, since Pointer and Value cannot conflict, never added in same instance.)
+            // If this had not been publicly exposed, we would not have needed the lock.
+            using (var synch = await _writeLock.LockAsync(_uniqueId + "Pointer"))
+            {
+                if (IsFull)
+                    return new MdOutOfEntriesError<Pointer>($"Filled: {Count}/{Constants.MdCapacity}");
+                if (Type == MdType.Values)
+                    return new InvalidOperation<Pointer>("Pointers can only be added in Pointer type Mds (i.e. Level > 0).");
+                var index = Count.ToString();
+                pointer.MdKey = index;
+                return await AddObjectAsync(index, pointer).ConfigureAwait(false);
+            }
         }
 
         /// <summary>
@@ -152,7 +140,7 @@ namespace SAFE.AppendOnlyDb.Network
                 StartIndex = this.StartIndex,
                 Next = node.MdLocator
             };
-
+            // this is not 100% AD
             var version = await _dataOps.GetEntryVersionAsync(Constants.METADATA_KEY).ConfigureAwait(false);
             await _dataOps.UpdateObjectAsync(Constants.METADATA_KEY, metadata, version).ConfigureAwait(false);
             _metadata = metadata;
@@ -182,10 +170,43 @@ namespace SAFE.AppendOnlyDb.Network
             }
         }
 
-        async Task AddObjectAsync(string key, object value)
+        async Task<Result<Pointer>> AddObjectAsync(string key, Pointer value)
         {
-            await _dataOps.AddObjectAsync(key, value).ConfigureAwait(false);
-            Interlocked.Increment(ref _count);
+            try
+            {
+                await _dataOps.AddObjectAsync(key, value).ConfigureAwait(false);
+                Interlocked.Increment(ref _count);
+
+                return Result.OK(value);
+            }
+            catch (FfiException ex)
+            {
+                if (ex.ErrorCode == -107) return new ValueAlreadyExists<Pointer>(ex.Message);
+                else if (ex.ErrorCode == -108) return new MdOutOfEntriesError<Pointer>($"Filled: {Count}/{Constants.MdCapacity}"); // entry limit exceeded
+                else throw; // something is wrong if we are here, so throw the exception. // todo: handle transient error
+            }
+        }
+
+        async Task<Result<Pointer>> AddObjectAsync(string key, StoredValue value)
+        {
+            try
+            {
+                await _dataOps.AddObjectAsync(key, value).ConfigureAwait(false);
+                Interlocked.Increment(ref _count);
+
+                return Result.OK(new Pointer // return pointer, to be used for indexing
+                {
+                    MdLocator = MdLocator,
+                    MdKey = key,
+                    ValueType = value.ValueType
+                });
+            }
+            catch (FfiException ex)
+            {
+                if (ex.ErrorCode == -107) return new ValueAlreadyExists<Pointer>(ex.Message);
+                else if (ex.ErrorCode == -108) return new MdOutOfEntriesError<Pointer>($"Filled: {Count}/{Constants.MdCapacity}"); // entry limit exceeded
+                else throw; // something is wrong if we are here, so throw the exception. // todo: handle transient error
+            }
         }
 
         async Task GetOrAddMetadata(MdMetadata metadata = null)

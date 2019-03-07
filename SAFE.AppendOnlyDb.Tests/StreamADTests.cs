@@ -177,14 +177,14 @@ namespace SAFE.AppendOnlyDb.Tests
         }
 
         [TestMethod]
-        public async Task Append_is_not_threadsafe()
+        public async Task Append_is_threadsafe()
         {
             // Arrange
             var stream = await GetStreamADAsync();
 
             ulong indexStart = 0;
-            ulong selectCount = 20;
-            var added = Enumerable.Range(0, 500);
+            ulong selectCount = 997;
+            var added = Enumerable.Range(0, (int)selectCount);
             
             // Act
             await Task.WhenAll(added.Select(c => stream.AppendAsync(new StoredValue(c))));
@@ -194,7 +194,7 @@ namespace SAFE.AppendOnlyDb.Tests
                 .ToListAsync();
 
             // Assert
-            Assert.IsFalse(Enumerable.SequenceEqual(range, Utils.EnumerableExt.LongRange(indexStart, selectCount)));
+            Assert.IsTrue(Enumerable.SequenceEqual(range, Utils.EnumerableExt.LongRange(indexStart, selectCount)));
         }
     }
 }

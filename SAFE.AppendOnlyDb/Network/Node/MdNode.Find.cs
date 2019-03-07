@@ -10,14 +10,13 @@ namespace SAFE.AppendOnlyDb.Network
     {
         public bool Contains(ulong version)
         {
-            // can Count be 0 at this point?
+            if (Count == 0) return false;
             switch (Type)
             {
                 case MdType.Values:
                     return NextVersion > version && version >= StartIndex;
                 case MdType.Pointers:
-                    var maxVersionHeld = (Count * Math.Pow(Capacity, Level)) - 1; // the node with this EndIndex exists, but we don't know at what version it is
-                    return version >= StartIndex && maxVersionHeld > version;
+                    return version >= StartIndex && MaxVersionHeld() > version;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(Type));
             }
@@ -61,14 +60,14 @@ namespace SAFE.AppendOnlyDb.Network
                         yield return item;
                 }
                 else
-                    await foreach (var item in FindRangeHereAsync(min, NextVersion - 1))
+                    await foreach (var item in FindRangeHereAsync(min, GetNextVersion()))
                         yield return item;
             }
             else if (Contains(max))
             {
                 var here = FindRangeHereAsync(StartIndex, max);
                 var previous = FindRangeInPreviousAsync(min, StartIndex - 1);
-                await foreach (var item in here.Concat(previous))
+                await foreach (var item in previous.Concat(here))
                     yield return item;
             }
         }
@@ -100,8 +99,8 @@ namespace SAFE.AppendOnlyDb.Network
                         .Select(c => c.Value)
                         .Where(c => !(c.Version is NoVersion)) // might be unnecessary safety measure;
                         .SelectMany(c => c.FindRangeAsync(
-                            Math.Max(indexMin, c.StartIndex),
-                            Math.Max(indexMax, (ulong)c.Version.Value)));
+                            Math.Max(min, c.StartIndex),
+                            Math.Min(max, (ulong)c.Version.Value)));
 
                     await foreach (var item in items)
                         yield return item;
@@ -144,8 +143,7 @@ namespace SAFE.AppendOnlyDb.Network
                 case MdType.Values:
                     return await GetValueAsync(version).ConfigureAwait(false);
                 case MdType.Pointers:
-                    var index = (ulong)Math.Truncate(version / Math.Pow(Capacity, Level));
-
+                    var index = GetIndex(version);
                     var pointer = await GetPointerAsync(index.ToString()).ConfigureAwait(false);
                     if (!pointer.HasValue)
                         return Result.Fail<StoredValue>(pointer.ErrorCode.Value, pointer.ErrorMsg);
@@ -173,6 +171,10 @@ namespace SAFE.AppendOnlyDb.Network
         }
 
         Task<Result<T>> TaskFrom<T>(Result<T> res) => Task.FromResult(res);
+        ulong GetNextVersion() => Type == MdType.Pointers ? MaxVersionHeld() : NextVersion - 1;
         ulong GetIndex(ulong version) => (ulong)Math.Truncate(version / Math.Pow(Capacity, Level));
+
+        // the node with this EndIndex exists, but we don't know at what version it is
+        ulong MaxVersionHeld() => Type == MdType.Pointers ? (ulong)(Count * Math.Pow(Capacity, Level)) - 1 : NextVersion - 1;
     }
 }

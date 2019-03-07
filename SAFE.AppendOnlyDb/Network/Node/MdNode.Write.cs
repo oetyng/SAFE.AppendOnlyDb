@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using SAFE.AppendOnlyDb.Utils;
 using SAFE.Data;
 using SafeApp.Utilities;
 
@@ -11,8 +10,6 @@ namespace SAFE.AppendOnlyDb.Network
 {
     internal sealed partial class MdNode
     {
-        readonly AsyncDuplicateLock _writeLock = new AsyncDuplicateLock();
-
         // Adds if not exists
         // It will return the direct pointer to the stored value
         // which makes it readily available for indexing at higher levels.
@@ -21,55 +18,52 @@ namespace SAFE.AppendOnlyDb.Network
 
         public async Task<Result<Pointer>> TryAppendAsync(StoredValue value, ExpectedVersion expectedVersion)
         {
-            using (var synch = await _writeLock.LockAsync(_uniqueId))
+            if (IsFull) return new MdOutOfEntriesError<Pointer>($"Filled: {Count}/{Constants.MdCapacity}");
+
+            switch (Type)
             {
-                if (IsFull) return new MdOutOfEntriesError<Pointer>($"Filled: {Count}/{Constants.MdCapacity}");
+                case MdType.Values:
+                    var versionRes = ValidateVersion(expectedVersion);
+                    if (!versionRes.HasValue) // optimistic concurrency
+                        return new VersionMismatch<Pointer>(versionRes.ErrorMsg);
+                    return await AddObjectAsync($"{NextVersion}", value).ConfigureAwait(false);
 
-                switch (Type)
-                {
-                    case MdType.Values:
-                        var versionRes = ValidateVersion(expectedVersion);
-                        if (!versionRes.HasValue) // optimistic concurrency
-                            return new VersionMismatch<Pointer>(versionRes.ErrorMsg);
-                        return await AddObjectAsync($"{NextVersion}", value).ConfigureAwait(false);
+                case MdType.Pointers:
+                    if (Count > 0)
+                    {
+                        var pointer = await GetLastPointer().ConfigureAwait(false);
+                        if (!pointer.HasValue) return pointer;
 
-                    case MdType.Pointers:
-                        if (Count > 0)
-                        {
-                            var pointer = await GetLastPointer().ConfigureAwait(false);
-                            if (!pointer.HasValue) return pointer;
+                        var targetResult = await LocateAsync(pointer.Value.MdLocator, _dataOps.Session).ConfigureAwait(false);
+                        if (!targetResult.HasValue)
+                            return targetResult.CastError<IMdNode, Pointer>();
+                        var target = targetResult.Value;
+                        if (target.IsFull)
+                            return await ExpandLevelAsync(value, expectedVersion, previous: target).ConfigureAwait(false);
 
-                            var targetResult = await LocateAsync(pointer.Value.MdLocator, _dataOps.Session).ConfigureAwait(false);
-                            if (!targetResult.HasValue)
-                                return Result.Fail<Pointer>(targetResult.ErrorCode.Value, targetResult.ErrorMsg);
-                            var target = targetResult.Value;
-                            if (target.IsFull)
-                                return await ExpandLevelAsync(value, expectedVersion, previous: target).ConfigureAwait(false);
+                        return await target.TryAppendAsync(value, expectedVersion).ConfigureAwait(false);
+                    }
 
-                            return await target.TryAppendAsync(value, expectedVersion).ConfigureAwait(false);
-                        }
+                    // Count == 0, i.e. we must get last MdNode held by Previous for this node. 
+                    // (i.e. last node, one level down, of previous node on this level)
+                    if (Previous == null)  // (if null Previous, this would be the very first, still empty, MdNode in the tree)
+                        return await ExpandLevelAsync(value, expectedVersion, previous: default).ConfigureAwait(false);
 
-                        // Count == 0, i.e. we must get last MdNode held by Previous for this node. 
-                        // (i.e. last node, one level down, of previous node on this level)
-                        if (Previous == null)  // (if null Previous, this would be the very first, still empty, MdNode in the tree)
-                            return await ExpandLevelAsync(value, expectedVersion, previous: default).ConfigureAwait(false);
+                    var prevNode = await LocateAsync(Previous, _dataOps.Session).ConfigureAwait(false);
+                    if (!prevNode.HasValue)
+                        return prevNode.CastError<IMdNode, Pointer>();
 
-                        var prevNode = await LocateAsync(Previous, _dataOps.Session).ConfigureAwait(false);
-                        if (!prevNode.HasValue)
-                            return Result.Fail<Pointer>(prevNode.ErrorCode.Value, prevNode.ErrorMsg);
+                    var lastPointerOfPrevNode = await (prevNode.Value as MdNode).GetLastPointer();
+                    if (!lastPointerOfPrevNode.HasValue)
+                        return lastPointerOfPrevNode;
 
-                        var lastPointerOfPrevNode = await (prevNode.Value as MdNode).GetLastPointer();
-                        if (!lastPointerOfPrevNode.HasValue)
-                            return lastPointerOfPrevNode;
+                    var prevNodeForNewNode = await LocateAsync(lastPointerOfPrevNode.Value.MdLocator, _dataOps.Session).ConfigureAwait(false);
+                    if (!prevNodeForNewNode.HasValue)
+                        return prevNodeForNewNode.CastError<IMdNode, Pointer>();
 
-                        var prevNodeForNewNode = await LocateAsync(lastPointerOfPrevNode.Value.MdLocator, _dataOps.Session).ConfigureAwait(false);
-                        if (!prevNodeForNewNode.HasValue)
-                            return Result.Fail<Pointer>(prevNodeForNewNode.ErrorCode.Value, prevNodeForNewNode.ErrorMsg);
-
-                        return await ExpandLevelAsync(value, expectedVersion, previous: prevNodeForNewNode.Value).ConfigureAwait(false);
-                    default:
-                        return new ArgumentOutOfRange<Pointer>(nameof(Type));
-                }
+                    return await ExpandLevelAsync(value, expectedVersion, previous: prevNodeForNewNode.Value).ConfigureAwait(false);
+                default:
+                    return new ArgumentOutOfRange<Pointer>(nameof(Type));
             }
         }
 
@@ -79,16 +73,13 @@ namespace SAFE.AppendOnlyDb.Network
             // we must distinguish it by appending "Pointer" to lock key.
             // (That is OK, since Pointer and Value cannot conflict, never added in same instance.)
             // If this had not been publicly exposed, we would not have needed the lock.
-            using (var synch = await _writeLock.LockAsync(_uniqueId + "Pointer"))
-            {
-                if (IsFull)
-                    return new MdOutOfEntriesError<Pointer>($"Filled: {Count}/{Constants.MdCapacity}");
-                if (Type == MdType.Values)
-                    return new InvalidOperation<Pointer>("Pointers can only be added in Pointer type Mds (i.e. Level > 0).");
-                var index = Count.ToString();
-                pointer.MdKey = index;
-                return await AddObjectAsync(index, pointer).ConfigureAwait(false);
-            }
+            if (IsFull)
+                return new MdOutOfEntriesError<Pointer>($"Filled: {Count}/{Constants.MdCapacity}");
+            if (Type == MdType.Values)
+                return new InvalidOperation<Pointer>("Pointers can only be added in Pointer type Mds (i.e. Level > 0).");
+            var index = Count.ToString();
+            pointer.MdKey = index;
+            return await AddObjectAsync(index, pointer).ConfigureAwait(false);
         }
 
         /// <summary>

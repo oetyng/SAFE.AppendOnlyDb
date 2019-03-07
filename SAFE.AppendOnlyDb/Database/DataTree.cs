@@ -1,14 +1,18 @@
-﻿using SAFE.Data;
+﻿using SAFE.AppendOnlyDb.Utils;
+using SAFE.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace SAFE.AppendOnlyDb
 {
     internal class DataTree : IStreamAD, IValueAD
     {
+        readonly AsyncDuplicateLock _writeLock = new AsyncDuplicateLock();
         readonly Func<MdLocator, Task> _onHeadAddressChange;
+        readonly string _uniqueId;
         IMdNode _head;
         IMdNode _currentLeaf;
 
@@ -18,6 +22,7 @@ namespace SAFE.AppendOnlyDb
         {
             _head = head;
             _onHeadAddressChange = onHeadAddressChange;
+            _uniqueId = Encoding.UTF8.GetString(head.MdLocator.XORName);
         }
 
         #region StreamAD
@@ -76,27 +81,30 @@ namespace SAFE.AppendOnlyDb
 
         async Task<Result<Pointer>> TryAppendAsync(StoredValue value, ExpectedVersion expectedVersion)
         {
-            if (_head.IsFull)
+            using (var synch = await _writeLock.LockAsync(_uniqueId))
             {
-                // create new head, add pointer to current head in to it.
-                // the level > 0 indicates its role as pointer holder
-                var meta = new MdMetadata
+                if (_head.IsFull)
                 {
-                    Level = _head.Level + 1,
-                    StartIndex = _head.StartIndex // this is the head, so it always starts from previous head start, i.e. zero
-                };
-                var newHead = await MdAccess.CreateAsync(meta).ConfigureAwait(false);
-                var pointer = new Pointer
-                {
-                    MdLocator = _head.MdLocator,
-                    ValueType = typeof(Pointer).Name
-                };
-                await newHead.AddAsync(pointer).ConfigureAwait(false);
-                _head = newHead;
-                await _onHeadAddressChange(newHead.MdLocator).ConfigureAwait(false);
-            }
+                    // create new head, add pointer to current head in to it.
+                    // the level > 0 indicates its role as pointer holder
+                    var meta = new MdMetadata
+                    {
+                        Level = _head.Level + 1,
+                        StartIndex = _head.StartIndex // this is the head, so it always starts from previous head start, i.e. zero
+                    };
+                    var newHead = await MdAccess.CreateAsync(meta).ConfigureAwait(false);
+                    var pointer = new Pointer
+                    {
+                        MdLocator = _head.MdLocator,
+                        ValueType = typeof(Pointer).Name
+                    };
+                    await newHead.AddAsync(pointer).ConfigureAwait(false);
+                    _head = newHead;
+                    await _onHeadAddressChange(newHead.MdLocator).ConfigureAwait(false);
+                }
 
-            return await DirectlyAppendToLeaf(value, expectedVersion).ConfigureAwait(false);
+                return await DirectlyAppendToLeaf(value, expectedVersion).ConfigureAwait(false);
+            }
         }
 
         /// <summary>
@@ -122,6 +130,8 @@ namespace SAFE.AppendOnlyDb
                     await _currentLeaf.SetNext(leafResult.Value); // for range search
                     _currentLeaf = leafResult.Value;
                 }
+                else
+                    return leafResult.CastError<IMdNode, Pointer>();
                 // else problem, since previous current won't 
                 // have done SetNext, which will break searching..
 

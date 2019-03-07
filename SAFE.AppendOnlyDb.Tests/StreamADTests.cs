@@ -88,6 +88,43 @@ namespace SAFE.AppendOnlyDb.Tests
         }
 
         [TestMethod]
+        public async Task StreamDb_reads_ordered_forwards_and_backwards()
+        {
+            // Arrange
+            var stream = await GetStreamADAsync();
+
+            var addCount = Math.Round(1.3 * Constants.MdCapacity);
+            var sw = new Stopwatch();
+
+            // Act
+            await Task.WhenAll(Enumerable.Range(0, (int)addCount)
+                .Select(c => stream.AppendAsync(new StoredValue(c)))).ConfigureAwait(false);
+
+            // Assert 1
+            var forwardEvents = await stream.ReadForwardFromAsync(0).ToListAsync();
+            Assert.IsNotNull(forwardEvents);
+            Assert.AreEqual(addCount, forwardEvents.Count);
+            var fwdVersions = forwardEvents.Select(c => c.Item1);
+            var fwdValues = forwardEvents.Select(c => c.Item2.Parse<int>());
+            Assert.IsTrue(Enumerable.SequenceEqual(fwdVersions, Utils.EnumerableExt.LongRange(0, (ulong)addCount)));
+            Assert.IsTrue(Enumerable.SequenceEqual(fwdValues, Enumerable.Range(0, (int)addCount)));
+
+            // Assert 2
+            var backwardEvents = await stream.ReadBackwardsFromAsync((ulong)addCount - 1).ToListAsync();
+            Assert.IsNotNull(backwardEvents);
+            Assert.AreEqual(addCount, backwardEvents.Count);
+
+            var bwdVersions = backwardEvents.Select(c => c.Item1).ToList();
+            var bwdValues = backwardEvents.Select(c => c.Item2.Parse<int>()).ToList();
+            var reverseInt32AddRange = Enumerable.Range(0, (int)addCount).Reverse().ToList(); // <- Reverse
+            var reverseUInt64AddRange = reverseInt32AddRange.Select(c => (ulong)c).ToList();
+
+            Assert.AreEqual(reverseInt32AddRange.Count, reverseUInt64AddRange.Count);
+            Assert.IsTrue(Enumerable.SequenceEqual(bwdValues, reverseInt32AddRange));
+            Assert.IsTrue(Enumerable.SequenceEqual(bwdVersions, reverseUInt64AddRange));
+        }
+
+        [TestMethod]
         public async Task GetRangeAsync_returns_expected_range()
         {
             // Arrange
@@ -183,11 +220,17 @@ namespace SAFE.AppendOnlyDb.Tests
             var stream = await GetStreamADAsync();
 
             ulong indexStart = 0;
-            ulong selectCount = 997;
+            ulong selectCount = 1997;
             var added = Enumerable.Range(0, (int)selectCount);
             
             // Act
-            await Task.WhenAll(added.Select(c => stream.AppendAsync(new StoredValue(c))));
+            var results = await Task.WhenAll(added.Select(c => stream.AppendAsync(new StoredValue(c))));
+            var errors = results.Where(c => !c.HasValue).ToList();
+            var successes = results.Where(c => c.HasValue).ToList();
+
+            Assert.AreEqual(0, errors.Count);
+            Assert.AreEqual((int)selectCount, successes.Count);
+
             var range = await stream.GetRangeAsync(indexStart, indexStart + selectCount - 1)
                 .Select(c => c.Item1)
                 .OrderBy(c => c)

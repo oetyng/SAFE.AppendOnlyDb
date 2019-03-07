@@ -120,11 +120,14 @@ namespace SAFE.AppendOnlyDb.Network
 
         async IAsyncEnumerable<(ulong, StoredValue)> FindRangeInNextAsync(ulong min, ulong max)
         {
-            var targetResult = await LocateAsync(Next, _dataOps.Session)
-                .ConfigureAwait(false);
-            var range = targetResult.Value.FindRangeAsync(min, max).ConfigureAwait(false);
-            await foreach (var item in range)
-                yield return item;
+            if (Next != null)
+            {
+                var targetResult = await LocateAsync(Next, _dataOps.Session)
+                    .ConfigureAwait(false);
+                var range = targetResult.Value.FindRangeAsync(min, max).ConfigureAwait(false);
+                await foreach (var item in range)
+                    yield return item;
+            }
         }
 
         async IAsyncEnumerable<(ulong, StoredValue)> FindRangeInPreviousAsync(ulong min, ulong max)

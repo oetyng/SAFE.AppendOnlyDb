@@ -13,6 +13,26 @@ namespace SAFE.Data
 
         public static Result<T> Fail<T>(int errorCode, string errorMsg)
             => new Result<T>(default, false, errorCode, errorMsg);
+
+        public static Result<T2> CastError<T1, T2>(this Result<T1> result)
+        {
+            switch (result)
+            {
+                case KeyNotFound<T1> r: return new KeyNotFound<T2>(r.ErrorMsg);
+                case ValueDeleted<T1> r: return new ValueDeleted<T2>(r.ErrorMsg);
+                case ValueAlreadyExists<T1> r: return new ValueAlreadyExists<T2>(r.ErrorMsg);
+                case VersionMismatch<T1> r: return new VersionMismatch<T2>(r.ErrorMsg);
+                case DeserializationError<T1> r: return new DeserializationError<T2>(r.ErrorMsg);
+                case MdOutOfEntriesError<T1> r: return new MdOutOfEntriesError<T2>(r.ErrorMsg);
+                case ArgumentOutOfRange<T1> r: return new ArgumentOutOfRange<T2>(r.ErrorMsg);
+                case MultipleResults<T1> r: return new MultipleResults<T2>(r.ErrorMsg);
+                case InvalidOperation<T1> r: return new InvalidOperation<T2>(r.ErrorMsg);
+                case DataNotFound<T1> r: return new DataNotFound<T2>(r.ErrorMsg);
+                case var r when !r.HasValue: return Fail<T2>(r.ErrorCode.Value, r.ErrorMsg);
+                case var r when r.HasValue: throw new System.NotSupportedException(nameof(result));
+                default: throw new System.ArgumentOutOfRangeException(nameof(result));
+            }
+        }
     }
 
     public class Result<T>

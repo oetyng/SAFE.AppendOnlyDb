@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading.Tasks;
-using SAFE.AppendOnlyDb.Utils;
 using SafeApp;
 using SafeApp.Utilities;
 
@@ -8,7 +7,6 @@ namespace SAFE.AppendOnlyDb.Network
 {
     internal sealed partial class MdNode : IMdNode
     {
-        readonly string _uniqueId;
         readonly MDataInfo _mdInfo;
         readonly MdDataOps _dataOps;
         MdMetadata _metadata;
@@ -32,7 +30,6 @@ namespace SAFE.AppendOnlyDb.Network
 
         public MdNode(MDataInfo mdInfo, Session session)
         {
-            _uniqueId = mdInfo.Name.Json();
             _mdInfo = mdInfo;
             _dataOps = new MdDataOps(session, mdInfo);
         }

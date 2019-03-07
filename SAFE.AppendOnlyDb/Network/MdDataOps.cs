@@ -266,10 +266,7 @@ namespace SAFE.AppendOnlyDb.Network
                 var payload = await _networkDataOps.GetImmutableData(map);
                 return await GetImD(payload);
             }
-            catch
-            {
-                return map;
-            }
+            catch (FfiException ex) when (ex.ErrorCode == -103) { return map; }
         }
     }
 }

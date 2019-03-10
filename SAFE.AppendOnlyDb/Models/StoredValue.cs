@@ -12,7 +12,7 @@ namespace SAFE.AppendOnlyDb
         public StoredValue(object data)
         {
             Payload = data.Json();
-            ValueType = data.GetType().FullName;
+            ValueType = data.GetType().AssemblyQualifiedName;
         }
 
         public string Payload { get; set; }

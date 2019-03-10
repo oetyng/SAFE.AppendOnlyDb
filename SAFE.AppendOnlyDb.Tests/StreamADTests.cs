@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
@@ -18,6 +19,37 @@ namespace SAFE.AppendOnlyDb.Tests
             var db = await GetDatabase("theDb");
             await db.AddStreamAsync(streamKey);
             return (await db.GetStreamAsync(streamKey)).Value;
+        }
+
+        [TestMethod]
+        public async Task Read()
+        {
+            // Arrange
+            var stream = await GetStreamADAsync();
+
+            var data = await stream.ReadForwardFromAsync(0).ToListAsync();
+
+            // Assert
+            Assert.IsNotNull(data);
+            Assert.IsInstanceOfType(data, typeof(List<(ulong, StoredValue)>));
+            Assert.AreEqual(0, data.Count);
+        }
+
+        // This test fails as the empty AsyncEnumerable
+        // throws an indexoutofrange exception. To be solved.
+        [TestMethod]
+        public async Task ReadsEmptyFindResult()
+        {
+            // Arrange
+            var stream = await GetStreamADAsync();
+
+            var data = stream.ReadForwardFromAsync(0)
+                .Select(c => c.Item2);
+
+            await foreach (var item in data)
+                Console.WriteLine(item);
+
+            // Assert
         }
 
         [TestMethod]

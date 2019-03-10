@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SAFE.AppendOnlyDb.Network;
+using System;
 using System.Threading.Tasks;
 
 namespace SAFE.Data.Client
@@ -21,5 +22,8 @@ namespace SAFE.Data.Client
 
         public async Task<T> GetOrAddDbAsync<T>(string dbId)
             => ((Result<T>)await _factory(_session, _appId, dbId)).Value;
+
+        public IImDStore GetImDStore()
+            => new ImDStore(new NetworkDataOps(_session));
     }
 }

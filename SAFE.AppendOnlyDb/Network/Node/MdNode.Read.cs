@@ -126,6 +126,8 @@ namespace SAFE.AppendOnlyDb.Network
             var lastNode = await GetLastNode();
             if (!lastNode.HasValue)
                 return 0;
+            if (lastNode.Value.Version is NoVersion)
+                return 0;
             return (ulong)lastNode.Value.Version.Value;
         }
 

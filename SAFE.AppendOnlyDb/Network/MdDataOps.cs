@@ -222,7 +222,7 @@ namespace SAFE.AppendOnlyDb.Network
         {
             if (payload.Count < 1000)
                 return payload;
-            var map = await _networkDataOps.StoreImmutableData(payload);
+            var map = await _networkDataOps.StoreImmutableData(payload.Compress());
             return await StoreImD(map);
         }
 
@@ -235,7 +235,7 @@ namespace SAFE.AppendOnlyDb.Network
             try
             {
                 var payload = await _networkDataOps.GetImmutableData(map);
-                return await GetImD(payload);
+                return await GetImD(payload.Decompress());
             }
             catch (FfiException ex) when (ex.ErrorCode == -103) { return map; }
         }

@@ -1,6 +1,5 @@
 ﻿using Newtonsoft.Json;
 using System;
-using System.Linq;
 
 namespace SAFE.AppendOnlyDb.Utils
 {
@@ -49,17 +48,14 @@ namespace SAFE.AppendOnlyDb.Utils
 
         public static object Parse(this string json, string typeName)
         {
-            var type = Type.GetType(typeName);
-            if (type == null)
-            {
-                var calling = System.Reflection.Assembly.GetCallingAssembly();
-                var entry = System.Reflection.Assembly.GetEntryAssembly();
-                var executing = System.Reflection.Assembly.GetExecutingAssembly();
-                var assemblies = new[] { calling, entry, executing };
-                type = assemblies.SelectMany(c => c.GetTypes().Where(t => t.Name == typeName)).FirstOrDefault();
-            }
-            
+            var type = Type.GetType(typeName, AssemblyResolver, null);           
             return JsonConvert.DeserializeObject(json, type, SerializerSettings); // //JsonConvert.DefaultSettings = () => SerializerSettings;
+        }
+
+        static System.Reflection.Assembly AssemblyResolver(System.Reflection.AssemblyName assemblyName)
+        {
+            assemblyName.Version = null;
+            return System.Reflection.Assembly.Load(assemblyName);
         }
     }
 }

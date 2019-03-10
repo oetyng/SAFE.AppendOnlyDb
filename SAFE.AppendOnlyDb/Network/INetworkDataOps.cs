@@ -6,7 +6,7 @@ using SafeApp.Utilities;
 
 namespace SAFE.AppendOnlyDb.Network
 {
-    internal interface INetworkDataOps
+    public interface INetworkDataOps
     {
         Session Session { get; }
         Task<MDataInfo> CreateEmptyMd(ulong typeTag);

@@ -4,7 +4,7 @@
     <TargetFramework>netcoreapp3.0</TargetFramework>
     <LangVersion>8.0</LangVersion>
     <DefineConstants>TRACE;SAFE_APP_MOCK</DefineConstants>
-    <Platforms>AnyCPU;x64</Platforms>
+    <Platforms>x64</Platforms>
     <PackageTags>maidsafe safenetwork oetyng decentralized database eventstore</PackageTags>
     <Description>EventStore (light) database on SAFENetwork (Safe Access For Everyone) - a decentralized, secure and anonymous data storage network.</Description>
     <Authors>oetyng</Authors>

@@ -7,6 +7,14 @@
     <Platforms>AnyCPU;x64</Platforms>
     <RootNamespace>SAFE.AuthClient</RootNamespace>
     <AssemblyName>SAFE.AuthClient</AssemblyName>
+    <PackageTags>maidsafe safenetwork oetyng decentralized auth</PackageTags>
+    <Description>Auth client for SAFENetwork (Safe Access For Everyone) - a decentralized, secure and anonymous data storage network.</Description>
+    <Authors>oetyng</Authors>
+    <Company>oetyng</Company>
+    <Copyright>2019 oetyng</Copyright>
+    <RepositoryUrl>https://github.com/oetyng/SAFE.AppendOnlyDb</RepositoryUrl>
+    <PackageLicenseUrl>https://licenses.nuget.org/MIT</PackageLicenseUrl>
+    <Version>0.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

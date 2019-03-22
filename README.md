@@ -1,6 +1,6 @@
 ## SAFE.AppendOnlyDb
 
-![Nuget (with prereleases)](https://img.shields.io/nuget/vpre/SAFE.AppendOnlyDb.svg)
+[![Nuget (with prereleases)](https://img.shields.io/nuget/vpre/SAFE.AppendOnlyDb.svg)](https://www.nuget.org/packages/SAFE.AppendOnlyDb)
 
 Implementation of `AppendableData`, according to design found here: [DataStore over AppendableData design](https://safenetforum.org/t/datastore-over-appendabledata-design/27611).
 

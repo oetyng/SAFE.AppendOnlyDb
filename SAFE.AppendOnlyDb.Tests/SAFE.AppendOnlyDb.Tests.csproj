@@ -13,11 +13,11 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.9.0" />
     <PackageReference Include="MSTest.TestAdapter" Version="1.3.2" />
     <PackageReference Include="MSTest.TestFramework" Version="1.3.2" />
+    <PackageReference Include="SAFE.AuthClient" Version="0.1.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\SAFE.AppendOnlyDb\SAFE.AppendOnlyDb.csproj" />
-    <ProjectReference Include="..\SAFE.AuthClient\SAFE.AuthClient.csproj" />
   </ItemGroup>
 
 </Project>

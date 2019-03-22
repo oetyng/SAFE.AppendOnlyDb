@@ -1,4 +1,7 @@
-## What is SAFE.AppendOnlyDb?
+## SAFE.AppendOnlyDb
+
+![Nuget (with prereleases)](https://img.shields.io/nuget/vpre/SAFE.AppendOnlyDb.svg)
+
 Implementation of `AppendableData`, according to design found here: [DataStore over AppendableData design](https://safenetforum.org/t/datastore-over-appendabledata-design/27611).
 
 Also a simple EventStore is implemented.

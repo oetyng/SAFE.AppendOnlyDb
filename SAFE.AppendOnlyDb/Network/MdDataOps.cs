@@ -11,16 +11,19 @@ namespace SAFE.AppendOnlyDb.Network
     internal class MdDataOps : IMdDataOps
     {
         readonly MDataInfo _mdInfo;
+        
         readonly INetworkDataOps _networkDataOps;
 
-        public Session Session { get; set; }
+        public Session Session { get; }
+        public IMdNodeFactory NodeFactory { get; }
         public MdLocator MdLocator => new MdLocator(_mdInfo.Name, _mdInfo.TypeTag, _mdInfo.EncKey, _mdInfo.EncNonce);
 
-        public MdDataOps(Session session, MDataInfo mdInfo)
+        public MdDataOps(IMdNodeFactory nodeFactory, INetworkDataOps networkOps, MDataInfo mdInfo)
         {
-            Session = session;
             _mdInfo = mdInfo;
-            _networkDataOps = new NetworkDataOps(session);
+            _networkDataOps = networkOps;
+            Session = networkOps.Session;
+            NodeFactory = nodeFactory;
         }
 
         public async Task<int> GetKeyCountAsync()
@@ -112,7 +115,7 @@ namespace SAFE.AppendOnlyDb.Network
                     {
                         var decryptedKey = await Session.MDataInfoActions.DecryptAsync(_mdInfo, entry.Key.Key);
                         var keystring = decryptedKey.ToUtfString();
-                        if (keystring == Constants.METADATA_KEY || keystring == Constants.SNAPSHOT_KEY)
+                        if (keystring == Constants.METADATA_KEY)
                             continue;
 
                         var key = keyParser(keystring);

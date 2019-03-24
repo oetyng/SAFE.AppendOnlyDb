@@ -1,8 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using SAFE.AppendOnlyDb.Snapshots;
 using SAFE.Data;
 using SafeApp.Utilities;
 
@@ -10,6 +10,8 @@ namespace SAFE.AppendOnlyDb.Network
 {
     internal sealed partial class MdNode
     {
+        Snapshotter _snapshotter;
+
         // Adds if not exists
         // It will return the direct pointer to the stored value
         // which makes it readily available for indexing at higher levels.
@@ -34,7 +36,7 @@ namespace SAFE.AppendOnlyDb.Network
                         var pointer = await GetLastPointer().ConfigureAwait(false);
                         if (!pointer.HasValue) return pointer;
 
-                        var targetResult = await MdNodeFactory.LocateAsync(pointer.Value.MdLocator, _dataOps.Session).ConfigureAwait(false);
+                        var targetResult = await _dataOps.NodeFactory.LocateAsync(pointer.Value.MdLocator).ConfigureAwait(false);
                         if (!targetResult.HasValue)
                             return targetResult.CastError<IMdNode, Pointer>();
                         var target = targetResult.Value;
@@ -49,7 +51,7 @@ namespace SAFE.AppendOnlyDb.Network
                     if (Previous == null)  // (if null Previous, this would be the very first, still empty, MdNode in the tree)
                         return await ExpandLevelAsync(value, expectedVersion, previous: default).ConfigureAwait(false);
 
-                    var prevNode = await MdNodeFactory.LocateAsync(Previous, _dataOps.Session).ConfigureAwait(false);
+                    var prevNode = await _dataOps.NodeFactory.LocateAsync(Previous).ConfigureAwait(false);
                     if (!prevNode.HasValue)
                         return prevNode.CastError<IMdNode, Pointer>();
 
@@ -57,7 +59,7 @@ namespace SAFE.AppendOnlyDb.Network
                     if (!lastPointerOfPrevNode.HasValue)
                         return lastPointerOfPrevNode;
 
-                    var prevNodeForNewNode = await MdNodeFactory.LocateAsync(lastPointerOfPrevNode.Value.MdLocator, _dataOps.Session).ConfigureAwait(false);
+                    var prevNodeForNewNode = await _dataOps.NodeFactory.LocateAsync(lastPointerOfPrevNode.Value.MdLocator).ConfigureAwait(false);
                     if (!prevNodeForNewNode.HasValue)
                         return prevNodeForNewNode.CastError<IMdNode, Pointer>();
 
@@ -80,30 +82,6 @@ namespace SAFE.AppendOnlyDb.Network
             var index = Count.ToString();
             pointer.MdKey = index;
             return await AddObjectAsync(index, pointer).ConfigureAwait(false);
-        }
-
-        /// <summary>
-        /// Stores a snapshot of all entries.
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="leftFold">The aggregating function</param>
-        /// <returns>true if snapshot was stored, false if already existed</returns>
-        public async Task<Result<bool>> Snapshot<T>(Func<IAsyncEnumerable<T>, byte[]> leftFold)
-        {
-            if (!IsFull)
-                return new InvalidOperation<bool>("Cannot snapshot unless Md is full!");
-            if (await _dataOps.ContainsKeyAsync(Constants.SNAPSHOT_KEY))
-                return Result.OK(false); // already snapshotted, i.e. OK with changed=false
-
-            var entries = _dataOps.GetEntriesAsync<ulong, StoredValue>((k) => ulong.Parse(k));
-            var ordered = entries
-                .OrderBy(c => c.Item1)
-                .Select(c => c.Item2.Parse<T>());
-
-            var snapshot = leftFold(ordered);
-            await _dataOps.AddObjectAsync(Constants.SNAPSHOT_KEY, snapshot);
-
-            return Result.OK(true); // OK with changed=true
         }
 
         public async Task<Result<bool>> SetNext(IMdNode node)
@@ -192,7 +170,7 @@ namespace SAFE.AppendOnlyDb.Network
             var keyCount = await _dataOps.GetKeyCountAsync().ConfigureAwait(false);
             if (keyCount > 0)
             {
-                _count = keyCount == 1000 ? keyCount - 2 : keyCount - 1;
+                _count = keyCount - 1;
                 _metadata = await _dataOps.GetValueAsync<MdMetadata>(Constants.METADATA_KEY).ConfigureAwait(false);
                 return;
             }
@@ -203,22 +181,29 @@ namespace SAFE.AppendOnlyDb.Network
             _metadata = metadata;
         }
 
-        Task<IMdNode> CreateNewMdNode(MdMetadata meta)
-            => MdNodeFactory.CreateNewMdNodeAsync(meta, _dataOps.Session, DataProtocol.DEFAULT_AD_PROTOCOL);
-
         async Task<Result<Pointer>> ExpandLevelAsync(StoredValue value, ExpectedVersion expectedVersion, IMdNode previous)
         {
             if (Level == 0)
                 return new ArgumentOutOfRange<Pointer>(nameof(Level));
 
+            byte[] snapshot = default;
+            if (_snapshotter != null && previous != null)
+            {
+                var snapshotResult = await _snapshotter.StoreSnapshot(previous);
+                if (!snapshotResult.HasValue)
+                    return snapshotResult.CastError<byte[], Pointer>();
+                snapshot = snapshotResult.Value;
+            }
+
             var meta = new MdMetadata
             {
                 Level = this.Level - 1,
+                Snapshot = snapshot,
                 Previous = previous?.MdLocator,
                 StartIndex = previous?.EndIndex + 1 ?? 0
             };
 
-            var md = await CreateNewMdNode(meta).ConfigureAwait(false);
+            var md = await _dataOps.NodeFactory.CreateNewMdNodeAsync(meta).ConfigureAwait(false);
             var leafPointer = await md.TryAppendAsync(value, expectedVersion).ConfigureAwait(false);
             if (!leafPointer.HasValue)
                 return leafPointer;

@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -10,20 +9,13 @@ namespace SAFE.AppendOnlyDb.Tests
     public class MutableCollectionTests : TestBase
     {
         [TestInitialize]
-        public async Task TestInitialize() => await InitClient();
-
-        async Task<IValueAD> GetValueADAsync()
-        {
-            var db = await GetDatabase("theDb");
-            var mdHead = await MdAccess.CreateAsync();
-            return new DataTree(mdHead, (s) => throw new ArgumentOutOfRangeException("Can only add 1k items to this collection."));
-        }
+        public async Task TestInitialize() => await Init();
 
         [TestMethod]
         public async Task Created_collection_is_empty()
         {
             // Arrange
-            var collection = new MutableCollection<int>(await GetValueADAsync());
+            var collection = await _fixture.CreateCollection<int>();
 
             // Act
             var empty = await collection.GetAsync()
@@ -39,7 +31,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task GetAsync_returns_added_values()
         {
             // Arrange
-            var collection = new MutableCollection<int>(await GetValueADAsync());
+            var collection = await _fixture.CreateCollection<int>();
 
             await collection.AddAsync(0);
             await collection.AddAsync(1);
@@ -62,7 +54,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task SetAsync_replaces_values()
         {
             // Arrange
-            var collection = new MutableCollection<int>(await GetValueADAsync());
+            var collection = await _fixture.CreateCollection<int>();
 
             await collection.AddAsync(0);
             await collection.AddAsync(1);

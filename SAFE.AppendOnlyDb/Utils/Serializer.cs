@@ -19,7 +19,7 @@ namespace SAFE.AppendOnlyDb.Utils
                         CurrencyDecimalDigits = 31
                     }
                 },
-                DateTimeZoneHandling = DateTimeZoneHandling.Utc,
+                //DateTimeZoneHandling = DateTimeZoneHandling.Utc,
                 ContractResolver = new PrivateMembersContractResolver()
             };
             SerializerSettings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter());

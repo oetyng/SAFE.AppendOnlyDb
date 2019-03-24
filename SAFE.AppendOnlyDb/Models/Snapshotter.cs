@@ -1,4 +1,5 @@
-﻿using SAFE.AppendOnlyDb.Utils;
+﻿using Newtonsoft.Json;
+using SAFE.AppendOnlyDb.Utils;
 using SAFE.Data;
 using System;
 using System.Collections.Generic;
@@ -8,21 +9,38 @@ using System.Threading.Tasks;
 
 namespace SAFE.AppendOnlyDb.Snapshots
 {
-    public class EmptySnapshot
+    public class SnapshotReading
     {
-
+        /// <summary>
+        /// The data map to an immutable data
+        /// with the serialized Snapshot instance.
+        /// </summary>
+        public byte[] SnapshotMap { get; set; }
+        
+        /// <summary>
+        /// All new events since the snapshot was taken.
+        /// </summary>
+        public IAsyncEnumerable<(ulong, StoredValue)> NewEvents { get; set; }
     }
 
     public class Snapshot
     {
+        [JsonConstructor]
+        Snapshot() { }
+
+        public Snapshot(object data)
+        {
+            Payload = data.GetBytes();
+            AssemblyQualifiedName = data.GetType().AssemblyQualifiedName;
+        }
+
         public byte[] Payload { get; set; }
         public string AssemblyQualifiedName { get; set; }
 
-        public static Snapshot Get(byte[] data)
-            => Encoding.UTF8.GetString(data).Parse<Snapshot>();
+        public static Snapshot Get(byte[] data) => data.Parse<Snapshot>();
 
-        public byte[] GetBytes()
-            => Encoding.UTF8.GetBytes(this.Json());
+        public byte[] Serialize() => this.GetBytes();
+        
 
         public TState GetState<TState>()
             => (TState)Encoding.UTF8.GetString(Payload).Parse(AssemblyQualifiedName);
@@ -75,14 +93,14 @@ namespace SAFE.AppendOnlyDb.Snapshots
                 previous = await GetSnapshotAsync(node.Snapshot);
 
             var snapshot = await _leftFold(previous, ordered);
-            var pointer = await _store.StoreImDAsync(snapshot.GetBytes());
+            var pointer = await _store.StoreImDAsync(snapshot.Serialize());
             return Result.OK(pointer);
         }
 
         public async Task<Snapshot> GetSnapshotAsync(byte[] pointer)
         {
             var bytes = await _store.GetImDAsync(pointer);
-            var snapshot = Snapshot.Get(bytes);
+            var snapshot = bytes.Parse<Snapshot>();
             return snapshot;
         }
     }

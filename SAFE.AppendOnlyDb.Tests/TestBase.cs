@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using SAFE.AppendOnlyDb.Factories;
+using SAFE.AppendOnlyDb.Snapshots;
 using SAFE.Data.Client;
 using SAFE.Data.Client.Auth;
 
@@ -15,16 +16,19 @@ namespace SAFE.AppendOnlyDb.Tests
             _fixture = new NetworkFixture();
             return _fixture.InitClient(inMem, mock);
         }
+
+        protected void SetSnapshotter(Snapshotter snapshotter)
+            => _fixture.SetSnapshotter(snapshotter);
     }
 
     internal class NetworkFixture
     {
         readonly string _appId = "testapp";
-        readonly Snapshots.Snapshotter _snapshotter;
+        Snapshotter _snapshotter;
         Network.IMdNodeFactory _nodeFactory;
         DataTreeFactory _dataTreeFactory;
         IStorageClient _client;
-        
+
         internal async Task InitClient(bool inMem = true, bool mock = true)
         {
             SAFEClient.SetFactory(async (sess, app, db) => await CreateForApp(sess, app, db));
@@ -36,6 +40,9 @@ namespace SAFE.AppendOnlyDb.Tests
             else // live network
                 throw new NotImplementedException("Live network not yet implemented.");
         }
+
+        internal void SetSnapshotter(Snapshotter snapshotter)
+            => _snapshotter = snapshotter;
 
         async Task<Data.Result<IStreamDb>> CreateForApp(SafeApp.Session session, string appId, string dbId)
         {
@@ -58,6 +65,13 @@ namespace SAFE.AppendOnlyDb.Tests
             return new DataTree(mdHead, (s) => throw new ArgumentOutOfRangeException("Can only add 1k items to this collection."));
         }
 
+        internal async Task<IStreamAD> GetStreamADAsync(string streamKey = "theStream")
+        {
+            var db = await GetDatabase("theDb");
+            await db.AddStreamAsync(streamKey);
+            return (await db.GetStreamAsync(streamKey)).Value;
+        }
+
         AppInfo GetAppInfo()
             => new AppInfo
             {
@@ -72,5 +86,8 @@ namespace SAFE.AppendOnlyDb.Tests
 
         internal Task<IStreamDb> GetDatabase(string dbName)
             => _client.GetOrAddDbAsync<IStreamDb>(dbName);
+
+        internal IImDStore GetImdStore()
+            => _client.GetImDStore();
     }
 }

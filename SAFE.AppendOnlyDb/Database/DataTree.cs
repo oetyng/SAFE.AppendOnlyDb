@@ -27,6 +27,13 @@ namespace SAFE.AppendOnlyDb
 
         #region StreamAD
 
+        /// <summary>
+        /// Reads the latest snapshot - if any - and all events since.
+        /// </summary>
+        /// <returns><see cref="SnapshotReading"/></returns>
+        Task<Result<Snapshots.SnapshotReading>> IStreamAD.ReadFromSnapshot()
+            => _currentLeaf?.ReadFromSnapshot() ?? _head.ReadFromSnapshot();
+
         IAsyncEnumerable<StoredValue> IStreamAD.GetAllValuesAsync()
             => _head.GetAllValuesAsync();
 

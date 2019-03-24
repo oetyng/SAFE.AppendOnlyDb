@@ -14,18 +14,11 @@ namespace SAFE.AppendOnlyDb.Tests
         [TestInitialize]
         public async Task TestInitialize() => await Init();
 
-        async Task<IStreamAD> GetStreamADAsync(string streamKey = "theStream")
-        {
-            var db = await _fixture.GetDatabase("theDb");
-            await db.AddStreamAsync(streamKey);
-            return (await db.GetStreamAsync(streamKey)).Value;
-        }
-
         [TestMethod]
         public async Task Read()
         {
             // Arrange
-            var stream = await GetStreamADAsync();
+            var stream = await _fixture.GetStreamADAsync();
 
             var data = await stream.ReadForwardFromAsync(0).ToListAsync();
 
@@ -41,7 +34,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task ReadsEmptyFindResult()
         {
             // Arrange
-            var stream = await GetStreamADAsync();
+            var stream = await _fixture.GetStreamADAsync();
 
             var data = stream.ReadForwardFromAsync(0)
                 .Select(c => c.Item2);
@@ -56,7 +49,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task AppendAsync_returns_pointer()
         {
             // Arrange
-            var stream = await GetStreamADAsync();
+            var stream = await _fixture.GetStreamADAsync();
             var theData = 42;
 
             // Act
@@ -72,7 +65,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task TryAppendAsync_with_wrong_version_fails()
         {
             // Arrange
-            var stream = await GetStreamADAsync();
+            var stream = await _fixture.GetStreamADAsync();
 
             var firstValue = "firstValue";
             await stream.AppendAsync(new StoredValue(firstValue));
@@ -93,7 +86,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task TryAppendAsync_with_correct_version_succeeds()
         {
             // Arrange
-            var stream = await GetStreamADAsync();
+            var stream = await _fixture.GetStreamADAsync();
 
             var firstValue = "firstValue";
             await stream.AppendAsync(new StoredValue(firstValue));
@@ -114,7 +107,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task Append_is_threadsafe()
         {
             // Arrange
-            var stream = await GetStreamADAsync();
+            var stream = await _fixture.GetStreamADAsync();
 
             ulong indexStart = 0;
             ulong selectCount = 1997;
@@ -141,7 +134,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task GetAtVersionAsync_returns_correct_value()
         {
             // Arrange
-            var stream = await GetStreamADAsync();
+            var stream = await _fixture.GetStreamADAsync();
 
             var firstValue = "firstValue";
             var middleValue = "middleValue"; // <= Expected value
@@ -166,7 +159,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task GetRangeAsync_returns_expected_range()
         {
             // Arrange
-            var stream = await GetStreamADAsync();
+            var stream = await _fixture.GetStreamADAsync();
 
             ulong indexStart = 54;
             ulong selectCount = 367;
@@ -188,7 +181,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task StreamDb_adds_more_than_md_capacity()
         {
             // Arrange
-            var stream = await GetStreamADAsync();
+            var stream = await _fixture.GetStreamADAsync();
 
             var addCount = Math.Round(1.3 * Constants.MdCapacity);
             var sw = new Stopwatch();
@@ -219,7 +212,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task StreamDb_reads_ordered_forwards_and_backwards()
         {
             // Arrange
-            var stream = await GetStreamADAsync();
+            var stream = await _fixture.GetStreamADAsync();
 
             var addCount = Math.Round(1.3 * Constants.MdCapacity);
             var sw = new Stopwatch();

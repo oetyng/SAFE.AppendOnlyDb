@@ -131,6 +131,22 @@ namespace SAFE.AppendOnlyDb.Network
             return (ulong)lastNode.Value.Version.Value;
         }
 
+        public async Task<Result<Snapshots.SnapshotReading>> ReadFromSnapshot()
+        {
+            var lastNodeRes = await GetLastNode();
+            if (!lastNodeRes.HasValue)
+                return lastNodeRes.CastError<IMdNode, Snapshots.SnapshotReading>();
+            var lastNode = lastNodeRes.Value;
+            var since = FindRangeAsync(lastNode.StartIndex, (ulong)lastNode.Version.Value);
+            var reading = new Snapshots.SnapshotReading
+            {
+                SnapshotMap = lastNode.Snapshot,
+                NewEvents = since
+            };
+            return Result.OK(reading);
+        }
+
+
         // ------------------------------------------------------------------------------------------------------------
         // ------------------------------ PRIVATE ------------------------------
         // ------------------------------------------------------------------------------------------------------------

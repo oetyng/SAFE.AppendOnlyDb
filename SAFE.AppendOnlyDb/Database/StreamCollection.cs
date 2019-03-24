@@ -5,12 +5,12 @@ using System.Threading.Tasks;
 
 namespace SAFE.AppendOnlyDb
 {
-    internal class StreamStore : IStreamStore
+    internal class StreamCollection : IStreamCollection
     {
         readonly MutableCollection<StreamType> _collection;
 
-        public StreamStore(IValueAD dataTree)
-            => _collection = new MutableCollection<StreamType>(dataTree);
+        public StreamCollection(IValueAD root, Factories.DataTreeFactory dataTreeFactory)
+            => _collection = new MutableCollection<StreamType>(root, dataTreeFactory);
 
         public async Task<Result<Pointer>> AddAsync(string type, MdLocator location)
         {

@@ -8,13 +8,13 @@ namespace SAFE.AppendOnlyDb.Tests
     public class StreamDbTests : TestBase
     {
         [TestInitialize]
-        public async Task TestInitialize() => await InitClient();
+        public async Task TestInitialize() => await Init();
 
         [TestMethod]
         public async Task Db_is_created()
         {
             // Arrange + Act
-            var db = await GetDatabase("theDb");
+            var db = await _fixture.GetDatabase("theDb");
 
             // Assert
             Assert.IsNotNull(db);
@@ -25,7 +25,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task AddStreamAsync_adds_stream()
         {
             // Arrange
-            var db = await GetDatabase("theDb");
+            var db = await _fixture.GetDatabase("theDb");
 
             // Act
             var result_1 = await db.AddStreamAsync("theStream");
@@ -45,7 +45,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task GetOrAddStreamAsync_gets_stream_when_exists()
         {
             // Arrange
-            var db = await GetDatabase("theDb");
+            var db = await _fixture.GetDatabase("theDb");
 
             // Act
             var result_1 = await db.AddStreamAsync("theStream");
@@ -65,7 +65,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task GetOrAddStreamAsync_adds_stream_when_not_exists()
         {
             // Arrange
-            var db = await GetDatabase("theDb");
+            var db = await _fixture.GetDatabase("theDb");
 
             // Act
             var result_2 = await db.GetOrAddStreamAsync("theStream");
@@ -80,7 +80,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task GetStreamAsync_returns_KeyNotFound_when_stream_does_not_exist()
         {
             // Arrange
-            var db = await GetDatabase("theDb");
+            var db = await _fixture.GetDatabase("theDb");
 
             // Act
             var result = await db.GetStreamAsync("theStream");
@@ -95,7 +95,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task Stream_is_added_once_only()
         {
             // Arrange
-            var db = await GetDatabase("theDb");
+            var db = await _fixture.GetDatabase("theDb");
             var result_1 = await db.AddStreamAsync("theStream");
 
             // Act

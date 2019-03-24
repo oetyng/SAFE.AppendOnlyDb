@@ -9,20 +9,13 @@ namespace SAFE.AppendOnlyDb.Tests
     public class ValueADTests : TestBase
     {
         [TestInitialize]
-        public async Task TestInitialize() => await InitClient();
-
-        async Task<IValueAD> GetValueADAsync()
-        {
-            var db = await GetDatabase("theDb");
-            var mdHead = await MdAccess.CreateAsync();
-            return new DataTree(mdHead, (s) => throw new ArgumentOutOfRangeException("Can only add 1k items to this collection."));
-        }
+        public async Task TestInitialize() => await Init();
 
         [TestMethod]
         public async Task GetValueAsync_returns_latest_value()
         {
             // Arrange
-            var valueAD = await GetValueADAsync();
+            var valueAD = await _fixture.GetValueADAsync();
 
             var firstValue = "firstValue";
             await valueAD.SetAsync(new StoredValue(firstValue));
@@ -52,7 +45,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task TrySetValueAsync_with_wrong_version_fails()
         {
             // Arrange
-            var valueAD = await GetValueADAsync();
+            var valueAD = await _fixture.GetValueADAsync();
 
             var firstValue = "firstValue";
             await valueAD.SetAsync(new StoredValue(firstValue));
@@ -73,7 +66,7 @@ namespace SAFE.AppendOnlyDb.Tests
         public async Task TrySetValueAsync_with_correct_version_succeeds()
         {
             // Arrange
-            var valueAD = await GetValueADAsync();
+            var valueAD = await _fixture.GetValueADAsync();
 
             var firstValue = "firstValue";
             await valueAD.SetAsync(new StoredValue(firstValue));

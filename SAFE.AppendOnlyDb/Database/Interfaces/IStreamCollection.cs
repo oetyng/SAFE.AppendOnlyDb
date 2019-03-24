@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace SAFE.AppendOnlyDb
 {
-    internal interface IStreamStore
+    internal interface IStreamCollection
     {
         Task<Result<Pointer>> AddAsync(string type, MdLocator location);
         IAsyncEnumerable<(string, MdLocator)> GetAllAsync();

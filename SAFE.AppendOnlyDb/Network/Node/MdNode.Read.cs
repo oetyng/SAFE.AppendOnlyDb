@@ -144,7 +144,7 @@ namespace SAFE.AppendOnlyDb.Network
                         return Result.OK((IMdNode)this);
                     else
                     {
-                        var nextResult = await MdNodeFactory.LocateAsync(Next, _dataOps.Session)
+                        var nextResult = await _dataOps.NodeFactory.LocateAsync(Next)
                             .ConfigureAwait(false);
                         return await (nextResult.Value as MdNode).GetLastNode();
                     }
@@ -153,7 +153,7 @@ namespace SAFE.AppendOnlyDb.Network
                     if (!pointer.HasValue)
                         return pointer.CastError<Pointer, IMdNode>();
 
-                    var targetResult = await MdNodeFactory.LocateAsync(pointer.Value.MdLocator, _dataOps.Session)
+                    var targetResult = await _dataOps.NodeFactory.LocateAsync(pointer.Value.MdLocator)
                         .ConfigureAwait(false);
                     return await (targetResult.Value as MdNode).GetLastNode();
                 default:

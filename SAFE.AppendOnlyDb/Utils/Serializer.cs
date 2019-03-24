@@ -26,6 +26,12 @@ namespace SAFE.AppendOnlyDb.Utils
             JsonConvert.DefaultSettings = () => SerializerSettings;
         }
 
+        public static byte[] GetBytes(this object data)
+            => System.Text.Encoding.UTF8.GetBytes(data.Json());
+
+        public static T Parse<T>(this byte[] bytes)
+            => System.Text.Encoding.UTF8.GetString(bytes).Parse<T>();
+
         public static string Json(this object data)
             => JsonConvert.SerializeObject(data, SerializerSettings);
 

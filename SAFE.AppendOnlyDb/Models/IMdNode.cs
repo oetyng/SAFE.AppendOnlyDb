@@ -28,7 +28,12 @@ namespace SAFE.AppendOnlyDb
         IAsyncEnumerable<(ulong, StoredValue)> ReadToEndAsync(ulong from);
         IAsyncEnumerable<(ulong, StoredValue)> FindRangeAsync(ulong from, ulong to); // from and to can be any values
         IAsyncEnumerable<StoredValue> GetAllValuesAsync();
-        // (Snapshot, IAsyncEnumerable<StoredValue>) GetStateSource(); // returns the snapshot - if any - and all events since (or just the events if no snapshot exists)
+
+        /// <summary>
+        /// Reads the latest snapshot - if any - and all events since.
+        /// </summary>
+        /// <returns><see cref="SnapshotReading"/></returns>
+        Task<Result<Snapshots.SnapshotReading>> ReadFromSnapshot();
 
         // ValueAD
         Task<Result<StoredValue>> GetLastVersionAsync(); // GetValueAsync

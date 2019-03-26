@@ -12,7 +12,7 @@
     <Copyright>2019 oetyng</Copyright>
     <RepositoryUrl>https://github.com/oetyng/SAFE.AppendOnlyDb</RepositoryUrl>
     <PackageLicenseUrl>https://licenses.nuget.org/MIT</PackageLicenseUrl>
-    <Version>0.1.0-alpha.1</Version>
+    <Version>0.1.0-alpha.2</Version>
   </PropertyGroup>
 
   <ItemGroup>

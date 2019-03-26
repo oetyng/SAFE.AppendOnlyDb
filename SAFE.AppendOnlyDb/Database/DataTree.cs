@@ -27,6 +27,13 @@ namespace SAFE.AppendOnlyDb
 
         #region StreamAD
 
+        /// <summary>
+        /// Reads the latest snapshot - if any - and all events since.
+        /// </summary>
+        /// <returns><see cref="SnapshotReading"/></returns>
+        Task<Result<Snapshots.SnapshotReading>> IStreamAD.ReadFromSnapshot()
+            => _currentLeaf?.ReadFromSnapshot() ?? _head.ReadFromSnapshot();
+
         IAsyncEnumerable<StoredValue> IStreamAD.GetAllValuesAsync()
             => _head.GetAllValuesAsync();
 
@@ -92,7 +99,7 @@ namespace SAFE.AppendOnlyDb
                         Level = _head.Level + 1,
                         StartIndex = _head.StartIndex // this is the head, so it always starts from previous head start, i.e. zero
                     };
-                    var newHead = await MdAccess.CreateAsync(meta).ConfigureAwait(false);
+                    var newHead = await _head.NodeFactory.CreateNewMdNodeAsync(meta).ConfigureAwait(false);
                     var pointer = new Pointer
                     {
                         MdLocator = _head.MdLocator,
@@ -124,7 +131,7 @@ namespace SAFE.AppendOnlyDb
                 if (!result.HasValue)
                     return result;
                 
-                var leafResult = await MdAccess.LocateAsync(result.Value.MdLocator);
+                var leafResult = await _head.NodeFactory.LocateAsync(result.Value.MdLocator);
                 if (leafResult.HasValue)
                 {
                     await _currentLeaf.SetNext(leafResult.Value); // for range search

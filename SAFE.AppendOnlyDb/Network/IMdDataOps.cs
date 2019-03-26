@@ -6,7 +6,8 @@ namespace SAFE.AppendOnlyDb.Network
 {
     internal interface IMdDataOps
     {
-        Session Session { get; set; }
+        Session Session { get; }
+        IMdNodeFactory NodeFactory { get; }
         MdLocator MdLocator { get; }
 
         Task AddObjectAsync(string key, object value);

@@ -131,6 +131,22 @@ namespace SAFE.AppendOnlyDb.Network
             return (ulong)lastNode.Value.Version.Value;
         }
 
+        public async Task<Result<Snapshots.SnapshotReading>> ReadFromSnapshot()
+        {
+            var lastNodeRes = await GetLastNode();
+            if (!lastNodeRes.HasValue)
+                return lastNodeRes.CastError<IMdNode, Snapshots.SnapshotReading>();
+            var lastNode = lastNodeRes.Value;
+            var since = FindRangeAsync(lastNode.StartIndex, (ulong)lastNode.Version.Value);
+            var reading = new Snapshots.SnapshotReading
+            {
+                SnapshotMap = lastNode.Snapshot,
+                NewEvents = since
+            };
+            return Result.OK(reading);
+        }
+
+
         // ------------------------------------------------------------------------------------------------------------
         // ------------------------------ PRIVATE ------------------------------
         // ------------------------------------------------------------------------------------------------------------
@@ -144,7 +160,7 @@ namespace SAFE.AppendOnlyDb.Network
                         return Result.OK((IMdNode)this);
                     else
                     {
-                        var nextResult = await MdNodeFactory.LocateAsync(Next, _dataOps.Session)
+                        var nextResult = await _dataOps.NodeFactory.LocateAsync(Next)
                             .ConfigureAwait(false);
                         return await (nextResult.Value as MdNode).GetLastNode();
                     }
@@ -153,7 +169,7 @@ namespace SAFE.AppendOnlyDb.Network
                     if (!pointer.HasValue)
                         return pointer.CastError<Pointer, IMdNode>();
 
-                    var targetResult = await MdNodeFactory.LocateAsync(pointer.Value.MdLocator, _dataOps.Session)
+                    var targetResult = await _dataOps.NodeFactory.LocateAsync(pointer.Value.MdLocator)
                         .ConfigureAwait(false);
                     return await (targetResult.Value as MdNode).GetLastNode();
                 default:

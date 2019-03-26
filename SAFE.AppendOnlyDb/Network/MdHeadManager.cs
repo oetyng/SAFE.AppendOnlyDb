@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using SAFE.AppendOnlyDb.Utils;
-using SAFE.Data;
-using SafeApp;
 using SafeApp.Utilities;
 
 namespace SAFE.AppendOnlyDb.Network
@@ -17,16 +15,18 @@ namespace SAFE.AppendOnlyDb.Network
         readonly string APP_CONTAINER_PATH;
 
         readonly ulong _protocol;
-        readonly NetworkDataOps _dataOps;
+        readonly INetworkDataOps _dataOps;
+        readonly IMdNodeFactory _nodeFactory;
 
         MdContainer _mdContainer;
         ulong _mdContainerVersion;
 
-        public MdHeadManager(Session session, string appId, ulong protocol)
+        public MdHeadManager(INetworkDataOps dataOps, IMdNodeFactory nodeFactory, string appId, ulong protocol)
         {
             APP_CONTAINER_PATH = $"apps/{appId}";
             _protocol = protocol;
-            _dataOps = new NetworkDataOps(session);
+            _dataOps = dataOps;
+            _nodeFactory = nodeFactory;
         }
 
         public async Task InitializeManager()
@@ -63,7 +63,7 @@ namespace SAFE.AppendOnlyDb.Network
             if (_mdContainer.MdLocators.ContainsKey(mdId))
             {
                 var location = _mdContainer.MdLocators[mdId];
-                var mdResult = await LocateMdNode(location);
+                var mdResult = await _nodeFactory.LocateAsync(location);
                 return new MdHead(mdResult.Value, mdId);
             }
 
@@ -93,16 +93,16 @@ namespace SAFE.AppendOnlyDb.Network
 
                 ++_mdContainerVersion;
 
-                var mdResult = await LocateMdNode(location);
+                var mdResult = await _nodeFactory.LocateAsync(location);
                 return new MdHead(mdResult.Value, mdId);
             }
         }
 
-        public Task<IMdNode> CreateNewMdNode(MdMetadata meta, ulong protocol) 
-            => MdNodeFactory.CreateNewMdNodeAsync(meta, _dataOps.Session, protocol);
+        //public Task<IMdNode> CreateNewMdNode(MdMetadata meta, ulong protocol) 
+        //    => _nodeFactory.CreateNewMdNodeAsync(meta, _dataOps.Session, protocol);
 
-        public Task<Result<IMdNode>> LocateMdNode(MdLocator location) 
-            => MdNodeFactory.LocateAsync(location, _dataOps.Session);
+        //public Task<Result<IMdNode>> LocateMdNode(MdLocator location) 
+        //    => _nodeFactory.LocateAsync(location, _dataOps.Session);
 
         async Task<bool> ExistsManagerAsync()
         {

@@ -8,7 +8,30 @@ namespace SAFE.AppendOnlyDb
         MdLocator()
         { }
 
-        public MdLocator(byte[] xorName, ulong typeTag, byte[] secEncKey, byte[] nonce)
+        public MdLocator(byte[] xorName, ulong typeTag)
+        {
+            XORName = xorName;
+            TypeTag = typeTag;
+        }
+
+        /// <summary>
+        /// The address of the Md this points at.
+        /// </summary>
+        public byte[] XORName { get; set; }
+
+        /// <summary>
+        /// Md type tag / protocol
+        /// </summary>
+        public ulong TypeTag { get; set; }
+    }
+
+    public class SecretMdLocator
+    {
+        [JsonConstructor]
+        SecretMdLocator()
+        { }
+
+        public SecretMdLocator(byte[] xorName, ulong typeTag, byte[] secEncKey, byte[] nonce)
         {
             XORName = xorName;
             TypeTag = typeTag;

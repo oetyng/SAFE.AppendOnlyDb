@@ -1,4 +1,5 @@
-﻿using SAFE.AppendOnlyDb.Network;
+﻿using SAFE.AppendOnlyDb;
+using SAFE.AppendOnlyDb.Network;
 using System;
 using System.Threading.Tasks;
 
@@ -24,6 +25,9 @@ namespace SAFE.Data.Client
             => ((Result<T>)await _factory(_session, _appId, dbId)).Value;
 
         public IImDStore GetImDStore()
-            => new ImDStore(new NetworkDataOps(_session));
+            => new ImDStore(new NetworkDataOps(_session, null));
+
+        public IImDStore GetImDStore(DbEncryption dbEncryption)
+            => new ImDStore(new NetworkDataOps(_session, dbEncryption));
     }
 }

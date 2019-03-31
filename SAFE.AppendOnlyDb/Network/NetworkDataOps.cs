@@ -11,12 +11,40 @@ namespace SAFE.AppendOnlyDb.Network
     internal class NetworkDataOps : INetworkDataOps
     {
         public Session Session { get; }
+        public DbEncryption DbEncryption { get; }
 
-        public NetworkDataOps(Session session)
-            => Session = session;
+        public NetworkDataOps(Session session, DbEncryption options = null)
+        {
+            Session = session;
+            DbEncryption = options;
+        }
 
         public static async Task<byte[]> GetMdXorName(string plainTextId)
             => (await Crypto.Sha3HashAsync(plainTextId.ToUtfBytes())).ToArray();
+
+        public async Task<List<byte>> TryEncryptAsync(List<byte> data)
+        {
+            if (DbEncryption == null)
+                return data;
+            using (var publicKey = await Session.Crypto.EncPubKeyNewAsync(DbEncryption.PublicKey).ConfigureAwait(false))
+            {
+                var encrypted = await Session.Crypto.EncryptSealedBoxAsync(data, publicKey).ConfigureAwait(false);
+                return encrypted;
+            }
+        }
+
+        public async Task<List<byte>> TryDecryptAsync(List<byte> data)
+        {
+            if (DbEncryption == null)
+                return data;
+            using (var publicKey = await Session.Crypto.EncPubKeyNewAsync(DbEncryption.PublicKey).ConfigureAwait(false))
+            using (var secretKey = await Session.Crypto.EncSecretKeyNewAsync(DbEncryption.SecretKey).ConfigureAwait(false))
+            {
+                var decrypted = await Session.Crypto.DecryptSealedBoxAsync(data, publicKey, secretKey).ConfigureAwait(false);
+                return decrypted;
+            }
+        }
+
 
         // Creates with data.
 
@@ -24,16 +52,36 @@ namespace SAFE.AppendOnlyDb.Network
         /// Empty, without data.
         /// </summary>
         /// <param name="permissionsHandle"></param>
-        /// <returns>SerialisedMdInfo</returns>
-        public Task<MDataInfo> CreateEmptyRandomPrivateMd(NativeHandle permissionsHandle, ulong protocol)
-            => CreateRandomPrivateMd(permissionsHandle, NativeHandle.EmptyMDataEntries, protocol);
+        /// <returns>An MDataInfo</returns>
+        public Task<MDataInfo> CreateRandomEmptyMd(NativeHandle permissionsHandle, ulong protocol)
+            => CreateRandomMd(permissionsHandle, NativeHandle.EmptyMDataEntries, protocol);
 
         /// <summary>
         /// </summary>
         /// <param name="permissionsHandle"></param>
         /// <param name="dataEntries"></param>
-        /// <returns>A serialised MdInfo</returns>
-        public async Task<MDataInfo> CreateRandomPrivateMd(NativeHandle permissionsHandle, NativeHandle dataEntries, ulong protocol)
+        /// <returns>An MDataInfo</returns>
+        public async Task<MDataInfo> CreateRandomMd(NativeHandle permissionsHandle, NativeHandle dataEntries, ulong protocol)
+        {
+            var mdInfo = await Session.MDataInfoActions.RandomPublicAsync(protocol);
+            await Session.MData.PutAsync(mdInfo, permissionsHandle, dataEntries); // <----------------------------------------------    Commit ------------------------
+            return mdInfo;
+        }
+
+        /// <summary>
+        /// Empty, without data.
+        /// </summary>
+        /// <param name="permissionsHandle"></param>
+        /// <returns>An MDataInfo</returns>
+        public Task<MDataInfo> CreatePrivateRandomEmptyMd(NativeHandle permissionsHandle, ulong protocol)
+            => CreatePrivateRandomMd(permissionsHandle, NativeHandle.EmptyMDataEntries, protocol);
+
+        /// <summary>
+        /// </summary>
+        /// <param name="permissionsHandle"></param>
+        /// <param name="dataEntries"></param>
+        /// <returns>An MDataInfo</returns>
+        public async Task<MDataInfo> CreatePrivateRandomMd(NativeHandle permissionsHandle, NativeHandle dataEntries, ulong protocol)
         {
             var mdInfo = await Session.MDataInfoActions.RandomPrivateAsync(protocol);
             await Session.MData.PutAsync(mdInfo, permissionsHandle, dataEntries); // <----------------------------------------------    Commit ------------------------
@@ -80,13 +128,26 @@ namespace SAFE.AppendOnlyDb.Network
                 using (var appSignPkH = await Session.Crypto.AppPubSignKeyAsync())
                     await Session.MDataPermissions.InsertAsync(permissionH, appSignPkH, GetFullPermissions());
 
+                var info = await Session.MDataInfoActions.RandomPublicAsync(typeTag);
+                await Session.MData.PutAsync(info, permissionH, NativeHandle.EmptyMDataEntries); // <----------------------------------------------    Commit ------------------------
+                return info;
+            }
+        }
+
+        public async Task<MDataInfo> CreatePrivateEmptyMd(ulong typeTag)
+        {
+            using (var permissionH = await Session.MDataPermissions.NewAsync())
+            {
+                using (var appSignPkH = await Session.Crypto.AppPubSignKeyAsync())
+                    await Session.MDataPermissions.InsertAsync(permissionH, appSignPkH, GetFullPermissions());
+
                 var info = await Session.MDataInfoActions.RandomPrivateAsync(typeTag);
                 await Session.MData.PutAsync(info, permissionH, NativeHandle.EmptyMDataEntries); // <----------------------------------------------    Commit ------------------------
                 return info;
             }
         }
 
-        public async Task<List<byte>> CreateEmptyMdSerialized(ulong typeTag)
+        public async Task<List<byte>> CreatePrivateEmptyMdSerialized(ulong typeTag)
         {
             using (var permissionH = await Session.MDataPermissions.NewAsync())
             {

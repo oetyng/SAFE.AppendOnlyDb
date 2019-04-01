@@ -33,8 +33,6 @@ namespace SAFE.AppendOnlyDb.Tests
 
             var mockClient = new CredentialAuth(_appId, inMem);
             var session = (await mockClient.AuthenticateAsync()).Value;
-            var encFactory = new DbEncryptionFactory(session.Crypto);
-            var dbEncryption = await encFactory.GenerateNewAsync();
             _networkDataOps = new NetworkDataOps(session);
 
             var snapshotter = snapShotterFactory == null ? null : snapShotterFactory(GetImdStore());

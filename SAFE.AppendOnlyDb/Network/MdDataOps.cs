@@ -11,8 +11,7 @@ namespace SAFE.AppendOnlyDb.Network
     internal class MdDataOps : IMdDataOps
     {
         readonly MDataInfo _mdInfo;
-        
-        readonly INetworkDataOps _networkDataOps;
+        readonly ImDStore _imDStore;
 
         public Session Session { get; }
         public IMdNodeFactory NodeFactory { get; }
@@ -21,7 +20,7 @@ namespace SAFE.AppendOnlyDb.Network
         public MdDataOps(IMdNodeFactory nodeFactory, INetworkDataOps networkOps, MDataInfo mdInfo)
         {
             _mdInfo = mdInfo;
-            _networkDataOps = networkOps;
+            _imDStore = new ImDStore(networkOps);
             Session = networkOps.Session;
             NodeFactory = nodeFactory;
         }
@@ -73,7 +72,7 @@ namespace SAFE.AppendOnlyDb.Network
             var map = await Session.MDataInfoActions.DecryptAsync(_mdInfo, mdRef.Item1).ConfigureAwait(false);
 
             // get ImD
-            var val = await GetImD(map);
+            var val = await GetImDAsync(map);
             return (val.ToUtfString(), mdRef.Item2);
         }
 
@@ -90,7 +89,7 @@ namespace SAFE.AppendOnlyDb.Network
                     if (entry.Value.Content.Count != 0)
                     {
                         var decryptedValue = await Session.MDataInfoActions.DecryptAsync(_mdInfo, entry.Value.Content).ConfigureAwait(false);
-                        var data = await GetImD(decryptedValue);
+                        var data = await GetImDAsync(decryptedValue);
                         if (data.ToUtfString().TryParse(out T result))
                             yield return result;
                     }
@@ -124,7 +123,7 @@ namespace SAFE.AppendOnlyDb.Network
 
                         var decryptedValue = await Session.MDataInfoActions.DecryptAsync(_mdInfo, entry.Value.Content);
 
-                        var data = await GetImD(decryptedValue);
+                        var data = await GetImDAsync(decryptedValue);
                         if (data.ToUtfString().TryParse(out TVal result))
                             yield return (key, result);
                     }
@@ -177,7 +176,7 @@ namespace SAFE.AppendOnlyDb.Network
             foreach (var pair in data)
             {
                 // store value to ImD
-                var map = await StoreImD(pair.Value.Json().ToUtfBytes());
+                var map = await StoreImDAsync(pair.Value.Json().ToUtfBytes());
 
                 var encryptedKey = await Session.MDataInfoActions.EncryptEntryKeyAsync(_mdInfo, pair.Key.ToUtfBytes()).ConfigureAwait(false);
                 var encryptedValue = await Session.MDataInfoActions.EncryptEntryValueAsync(_mdInfo, map).ConfigureAwait(false);
@@ -193,7 +192,7 @@ namespace SAFE.AppendOnlyDb.Network
                 // store value to ImD
 
                 var val = pair.Value.Item1;
-                var map = await StoreImD(val.Json().ToUtfBytes());
+                var map = await StoreImDAsync(val.Json().ToUtfBytes());
 
                 var version = pair.Value.Item2;
 
@@ -219,28 +218,25 @@ namespace SAFE.AppendOnlyDb.Network
         public Task CommitEntryMutationAsync(NativeHandle entryActionsH)
             => Session.MData.MutateEntriesAsync(_mdInfo, entryActionsH); // <----------------------------------------------    Commit ------------------------
 
+
         // While map size is too large for an MD entry
         // store the map as ImD.
-        async Task<List<byte>> StoreImD(List<byte> payload)
+        async Task<List<byte>> StoreImDAsync(List<byte> payload)
         {
             if (payload.Count < 1000)
                 return payload;
-            var map = await _networkDataOps.StoreImmutableData(payload.Compress());
-            return await StoreImD(map);
+            var map = await _imDStore.StoreImDAsync(payload.ToArray());
+            return map.ToList();
         }
 
         // While not throwing,
         // the payload is a datamap.
         // NB: Obviously this is not resistant to other errors,
         // so we must catch the specific exception here. (todo)
-        async Task<List<byte>> GetImD(List<byte> map)
+        async Task<List<byte>> GetImDAsync(List<byte> map)
         {
-            try
-            {
-                var payload = await _networkDataOps.GetImmutableData(map);
-                return await GetImD(payload.Decompress());
-            }
-            catch (FfiException ex) when (ex.ErrorCode == -103) { return map; }
+            var data = await _imDStore.GetImDAsync(map.ToArray());
+            return data.ToList();
         }
     }
 }

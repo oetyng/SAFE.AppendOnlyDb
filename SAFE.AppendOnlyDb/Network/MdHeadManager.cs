@@ -39,8 +39,8 @@ namespace SAFE.AppendOnlyDb.Network
 
                 // Insert a serialized mdContainer into App Container
                 var appContainer = await _dataOps.Session.AccessContainer.GetMDataInfoAsync(APP_CONTAINER_PATH);
-                var dbIdCipherBytes = await _dataOps.TryEncryptAsync(MD_CONTAINER_KEY_BYTES);
-                var dbCipherBytes = await _dataOps.TryEncryptAsync(serializedDbContainer.ToUtfBytes());
+                var dbIdCipherBytes = await _dataOps.Session.MDataInfoActions.EncryptEntryKeyAsync(appContainer, MD_CONTAINER_KEY_BYTES);
+                var dbCipherBytes = await _dataOps.Session.MDataInfoActions.EncryptEntryValueAsync(appContainer, serializedDbContainer.ToUtfBytes());
                 using (var appContEntryActionsH = await _dataOps.Session.MDataEntryActions.NewAsync())
                 {
                     await _dataOps.Session.MDataEntryActions.InsertAsync(appContEntryActionsH, dbIdCipherBytes, dbCipherBytes);
@@ -74,17 +74,17 @@ namespace SAFE.AppendOnlyDb.Network
                     await _dataOps.Session.MDataPermissions.InsertAsync(permissionsHandle, appSignPkH, _dataOps.GetFullPermissions());
 
                 // New mdHead
-                var mdInfo = await _dataOps.CreateRandomEmptyMd(permissionsHandle, DataProtocol.DEFAULT_AD_PROTOCOL); // TODO: DataProtocol.MD_HEAD);
-                var locator = new MdLocator(mdInfo.Name, mdInfo.TypeTag);
+                var mdInfo = await _dataOps.CreateEmptyRandomPrivateMd(permissionsHandle, DataProtocol.DEFAULT_AD_PROTOCOL); // TODO: DataProtocol.MD_HEAD);
+                var location = new MdLocator(mdInfo.Name, mdInfo.TypeTag, mdInfo.EncKey, mdInfo.EncNonce);
 
                 // add mdHead to mdContainer
-                _mdContainer.MdLocators[mdId] = locator;
+                _mdContainer.MdLocators[mdId] = location;
 
                 // Finally update App Container with newly serialized mdContainer
                 var serializedMdContainer = _mdContainer.Json();
                 var appContainer = await _dataOps.Session.AccessContainer.GetMDataInfoAsync(APP_CONTAINER_PATH);
-                var mdKeyCipherBytes = await _dataOps.TryEncryptAsync(MD_CONTAINER_KEY_BYTES);
-                var mdCipherBytes = await _dataOps.TryEncryptAsync(serializedMdContainer.ToUtfBytes());
+                var mdKeyCipherBytes = await _dataOps.Session.MDataInfoActions.EncryptEntryKeyAsync(appContainer, MD_CONTAINER_KEY_BYTES);
+                var mdCipherBytes = await _dataOps.Session.MDataInfoActions.EncryptEntryValueAsync(appContainer, serializedMdContainer.ToUtfBytes());
                 using (var appContEntryActionsH = await _dataOps.Session.MDataEntryActions.NewAsync())
                 {
                     await _dataOps.Session.MDataEntryActions.UpdateAsync(appContEntryActionsH, mdKeyCipherBytes, mdCipherBytes, _mdContainerVersion + 1);
@@ -93,16 +93,22 @@ namespace SAFE.AppendOnlyDb.Network
 
                 ++_mdContainerVersion;
 
-                var mdResult = await _nodeFactory.LocateAsync(locator);
+                var mdResult = await _nodeFactory.LocateAsync(location);
                 return new MdHead(mdResult.Value, mdId);
             }
         }
+
+        //public Task<IMdNode> CreateNewMdNode(MdMetadata meta, ulong protocol) 
+        //    => _nodeFactory.CreateNewMdNodeAsync(meta, _dataOps.Session, protocol);
+
+        //public Task<Result<IMdNode>> LocateMdNode(MdLocator location) 
+        //    => _nodeFactory.LocateAsync(location, _dataOps.Session);
 
         async Task<bool> ExistsManagerAsync()
         {
             // Gets the App Container, then checks if it has any key that equals the encrypted name of "md_container"
             var appCont = await _dataOps.Session.AccessContainer.GetMDataInfoAsync(APP_CONTAINER_PATH);
-            var mdKeyCipherBytes = await _dataOps.TryEncryptAsync(MD_CONTAINER_KEY_BYTES);
+            var mdKeyCipherBytes = await _dataOps.Session.MDataInfoActions.EncryptEntryKeyAsync(appCont, MD_CONTAINER_KEY_BYTES);
             var keys = await _dataOps.Session.MData.ListKeysAsync(appCont);
             return keys.Any(c => c.Key.SequenceEqual(mdKeyCipherBytes));
         }
@@ -110,12 +116,12 @@ namespace SAFE.AppendOnlyDb.Network
         async Task<MdContainer> LoadDbContainer()
         {
             var appContainerInfo = await _dataOps.Session.AccessContainer.GetMDataInfoAsync(APP_CONTAINER_PATH);
-            var mdKeyCipherBytes = await _dataOps.TryEncryptAsync(MD_CONTAINER_KEY_BYTES);
+            var mdKeyCipherBytes = await _dataOps.Session.MDataInfoActions.EncryptEntryKeyAsync(appContainerInfo, MD_CONTAINER_KEY_BYTES);
             var cipherTxtEntryVal = await _dataOps.Session.MData.GetValueAsync(appContainerInfo, mdKeyCipherBytes);
 
             _mdContainerVersion = cipherTxtEntryVal.Item2;
 
-            var plainTxtEntryVal = await _dataOps.TryDecryptAsync(cipherTxtEntryVal.Item1);
+            var plainTxtEntryVal = await _dataOps.Session.MDataInfoActions.DecryptAsync(appContainerInfo, cipherTxtEntryVal.Item1);
             var mdContainerJson = plainTxtEntryVal.ToUtfString();
             _mdContainer = mdContainerJson.Parse<MdContainer>();
             return _mdContainer;

@@ -16,7 +16,8 @@ namespace SAFE.AppendOnlyDb.Network
 
         public async Task<Result<IMdNode>> LocateAsync(MdLocator location)
         {
-            var mdResult = await _networkOps.LocatePublicMd(location.XORName, location.TypeTag)
+            // var mdResult = await networkDataOps.LocatePublicMd(location.XORName, location.TypeTag);
+            var mdResult = await _networkOps.LocatePrivateMd(location.XORName, location.TypeTag, location.SecEncKey, location.Nonce)
                 .ConfigureAwait(false);
             if (!mdResult.HasValue)
                 return new KeyNotFound<IMdNode>($"Could not locate md: {location.TypeTag}, {location.XORName}");

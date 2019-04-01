@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -12,18 +11,17 @@ namespace SAFE.AppendOnlyDb.Network
     internal class MdDataOps : IMdDataOps
     {
         readonly MDataInfo _mdInfo;
-        readonly INetworkDataOps _networkOps;
-        readonly ImDStore _imDStore;
+        
+        readonly INetworkDataOps _networkDataOps;
 
         public Session Session { get; }
         public IMdNodeFactory NodeFactory { get; }
-        public MdLocator MdLocator => new MdLocator(_mdInfo.Name, _mdInfo.TypeTag);
+        public MdLocator MdLocator => new MdLocator(_mdInfo.Name, _mdInfo.TypeTag, _mdInfo.EncKey, _mdInfo.EncNonce);
 
         public MdDataOps(IMdNodeFactory nodeFactory, INetworkDataOps networkOps, MDataInfo mdInfo)
         {
             _mdInfo = mdInfo;
-            _networkOps = networkOps;
-            _imDStore = new ImDStore(networkOps);
+            _networkDataOps = networkOps;
             Session = networkOps.Session;
             NodeFactory = nodeFactory;
         }
@@ -38,24 +36,19 @@ namespace SAFE.AppendOnlyDb.Network
         {
             var keyEntries = await Session.MData.ListKeysAsync(_mdInfo).ConfigureAwait(false);
             var keys = keyEntries.Select(c => c.Key);
-            var encryptedKey = await _networkOps.TryEncryptAsync(key.ToUtfBytes()).ConfigureAwait(false);
+            var encryptedKey = await Session.MDataInfoActions.EncryptEntryKeyAsync(_mdInfo, key.ToUtfBytes()).ConfigureAwait(false);
             return keys.Any(c => c.SequenceEqual(encryptedKey));
         }
 
         public async IAsyncEnumerable<string> GetKeysAsync()
         {
             var keyEntries = await Session.MData.ListKeysAsync(_mdInfo).ConfigureAwait(false);
-            var keyTasks = keyEntries.Select(c => _networkOps.TryDecryptAsync(c.Key));
-
-            var data = new ConcurrentBag<string>();
-            Parallel.ForEach(keyEntries, c =>
+            var keyTasks = keyEntries.Select(c => Session.MDataInfoActions.DecryptAsync(_mdInfo, c.Key));
+            foreach (var entry in keyEntries)
             {
-                var key = _networkOps.TryDecryptAsync(c.Key).GetAwaiter().GetResult();
-                data.Add(key.ToUtfString());
-            });
-
-            foreach (var entry in data)
-                yield return entry;
+                var key = await Session.MDataInfoActions.DecryptAsync(_mdInfo, entry.Key);
+                yield return key.ToUtfString();
+            }
         }
 
         public async Task<T> GetValueAsync<T>(string key)
@@ -66,7 +59,8 @@ namespace SAFE.AppendOnlyDb.Network
 
         public async Task<ulong> GetEntryVersionAsync(string key)
         {
-            var encryptedKey = await _networkOps.TryEncryptAsync(key.ToUtfBytes()).ConfigureAwait(false);
+            var keyBytes = key.ToUtfBytes();
+            var encryptedKey = await Session.MDataInfoActions.EncryptEntryKeyAsync(_mdInfo, keyBytes).ConfigureAwait(false);
             var mdRef = await Session.MData.GetValueAsync(_mdInfo, encryptedKey).ConfigureAwait(false);
             return mdRef.Item2;
         }
@@ -74,37 +68,34 @@ namespace SAFE.AppendOnlyDb.Network
         public async Task<(string, ulong)> GetStringValueAsync(string key)
         {
             var keyBytes = key.ToUtfBytes();
-            var encryptedKey = await _networkOps.TryEncryptAsync(keyBytes).ConfigureAwait(false);
+            var encryptedKey = await Session.MDataInfoActions.EncryptEntryKeyAsync(_mdInfo, keyBytes).ConfigureAwait(false);
             var mdRef = await Session.MData.GetValueAsync(_mdInfo, encryptedKey).ConfigureAwait(false);
-            var map = await _networkOps.TryDecryptAsync(mdRef.Item1).ConfigureAwait(false);
+            var map = await Session.MDataInfoActions.DecryptAsync(_mdInfo, mdRef.Item1).ConfigureAwait(false);
 
             // get ImD
-            var val = await GetImDAsync(map);
+            var val = await GetImD(map);
             return (val.ToUtfString(), mdRef.Item2);
         }
 
         // Todo: evaluate if this should fetch entries instead, internally, and filter out the 2 reserved fields
         public async IAsyncEnumerable<T> GetValuesAsync<T>()
         {
-            var values = new ConcurrentBag<T>();
             using (var entriesHandle = await Session.MDataEntries.GetHandleAsync(_mdInfo).ConfigureAwait(false))
             {
                 // Fetch and decrypt entries
                 var encryptedEntries = await Session.MData.ListEntriesAsync(entriesHandle).ConfigureAwait(false);
-                Parallel.ForEach(encryptedEntries, entry =>
+                foreach (var entry in encryptedEntries)
                 {
                     // protects against deleted entries
                     if (entry.Value.Content.Count != 0)
                     {
-                        var decryptedValue = _networkOps.TryDecryptAsync(entry.Value.Content).GetAwaiter().GetResult();
-                        var data = GetImDAsync(decryptedValue).GetAwaiter().GetResult();
+                        var decryptedValue = await Session.MDataInfoActions.DecryptAsync(_mdInfo, entry.Value.Content).ConfigureAwait(false);
+                        var data = await GetImD(decryptedValue);
                         if (data.ToUtfString().TryParse(out T result))
-                            values.Add(result);
+                            yield return result;
                     }
-                });
+                }
             }
-            foreach (var val in values)
-                yield return val;
         }
 
         public IAsyncEnumerable<(TKey, TVal)> GetEntriesAsync<TKey, TVal>(Func<string, TKey> keyParser)
@@ -112,36 +103,33 @@ namespace SAFE.AppendOnlyDb.Network
 
         public async IAsyncEnumerable<(TKey, TVal)> GetEntriesAsync<TKey, TVal>(Func<string, TKey> keyParser, Func<TKey, bool> selector)
         {
-            var values = new ConcurrentBag<(TKey, TVal)>();
             using (var entriesHandle = await Session.MDataEntries.GetHandleAsync(_mdInfo).ConfigureAwait(false))
             {
                 // Fetch and decrypt entries
                 var encryptedEntries = await Session.MData.ListEntriesAsync(entriesHandle).ConfigureAwait(false);
 
-                Parallel.ForEach(encryptedEntries, entry =>
+                foreach (var entry in encryptedEntries)
                 {
                     // protects against deleted entries // should not be valid operation on append only though
                     if (entry.Value.Content.Count != 0)
                     {
-                        var decryptedKey = _networkOps.TryDecryptAsync(entry.Key.Key).GetAwaiter().GetResult();
+                        var decryptedKey = await Session.MDataInfoActions.DecryptAsync(_mdInfo, entry.Key.Key);
                         var keystring = decryptedKey.ToUtfString();
                         if (keystring == Constants.METADATA_KEY)
-                            return;
+                            continue;
 
                         var key = keyParser(keystring);
                         if (!selector(key)) // within range forexample
-                            return;
+                            continue;
 
-                        var decryptedValue = _networkOps.TryDecryptAsync(entry.Value.Content).GetAwaiter().GetResult();
+                        var decryptedValue = await Session.MDataInfoActions.DecryptAsync(_mdInfo, entry.Value.Content);
 
-                        var data = GetImDAsync(decryptedValue).GetAwaiter().GetResult();
+                        var data = await GetImD(decryptedValue);
                         if (data.ToUtfString().TryParse(out TVal result))
-                            values.Add((key, result));
+                            yield return (key, result);
                     }
-                });
+                }
             }
-            foreach (var val in values)
-                yield return val;
         }
 
         public async Task AddObjectAsync(string key, object value)
@@ -189,10 +177,10 @@ namespace SAFE.AppendOnlyDb.Network
             foreach (var pair in data)
             {
                 // store value to ImD
-                var map = await StoreImDAsync(pair.Value.Json().ToUtfBytes());
+                var map = await StoreImD(pair.Value.Json().ToUtfBytes());
 
-                var encryptedKey = await _networkOps.TryEncryptAsync(pair.Key.ToUtfBytes()).ConfigureAwait(false);
-                var encryptedValue = await _networkOps.TryEncryptAsync(map).ConfigureAwait(false);
+                var encryptedKey = await Session.MDataInfoActions.EncryptEntryKeyAsync(_mdInfo, pair.Key.ToUtfBytes()).ConfigureAwait(false);
+                var encryptedValue = await Session.MDataInfoActions.EncryptEntryValueAsync(_mdInfo, map).ConfigureAwait(false);
                 await Session.MDataEntryActions.InsertAsync(entryActionsH, encryptedKey, encryptedValue).ConfigureAwait(false);
             }
         }
@@ -205,12 +193,12 @@ namespace SAFE.AppendOnlyDb.Network
                 // store value to ImD
 
                 var val = pair.Value.Item1;
-                var map = await StoreImDAsync(val.Json().ToUtfBytes());
+                var map = await StoreImD(val.Json().ToUtfBytes());
 
                 var version = pair.Value.Item2;
 
-                var encryptedKey = await _networkOps.TryEncryptAsync(pair.Key.ToUtfBytes()).ConfigureAwait(false);
-                var encryptedValue = await _networkOps.TryEncryptAsync(map).ConfigureAwait(false);
+                var encryptedKey = await Session.MDataInfoActions.EncryptEntryKeyAsync(_mdInfo, pair.Key.ToUtfBytes()).ConfigureAwait(false);
+                var encryptedValue = await Session.MDataInfoActions.EncryptEntryValueAsync(_mdInfo, map).ConfigureAwait(false);
 
                 await Session.MDataEntryActions.UpdateAsync(entryActionsH, encryptedKey, encryptedValue, version).ConfigureAwait(false);
             }
@@ -222,7 +210,7 @@ namespace SAFE.AppendOnlyDb.Network
             foreach (var pair in data)
             {
                 var version = pair.Value;
-                var encryptedKey = await _networkOps.TryEncryptAsync(pair.Key.ToUtfBytes()).ConfigureAwait(false);
+                var encryptedKey = await Session.MDataInfoActions.EncryptEntryKeyAsync(_mdInfo, pair.Key.ToUtfBytes()).ConfigureAwait(false);
                 await Session.MDataEntryActions.DeleteAsync(entryActionsH, encryptedKey, version).ConfigureAwait(false);
             }
         }
@@ -233,22 +221,26 @@ namespace SAFE.AppendOnlyDb.Network
 
         // While map size is too large for an MD entry
         // store the map as ImD.
-        async Task<List<byte>> StoreImDAsync(List<byte> payload)
+        async Task<List<byte>> StoreImD(List<byte> payload)
         {
             if (payload.Count < 1000)
                 return payload;
-            var map = await _imDStore.StoreImDAsync(payload.ToArray());
-            return map.ToList();
+            var map = await _networkDataOps.StoreImmutableData(payload.Compress());
+            return await StoreImD(map);
         }
 
         // While not throwing,
         // the payload is a datamap.
         // NB: Obviously this is not resistant to other errors,
         // so we must catch the specific exception here. (todo)
-        async Task<List<byte>> GetImDAsync(List<byte> map)
+        async Task<List<byte>> GetImD(List<byte> map)
         {
-            var data = await _imDStore.GetImDAsync(map.ToArray());
-            return data.ToList();
+            try
+            {
+                var payload = await _networkDataOps.GetImmutableData(map);
+                return await GetImD(payload.Decompress());
+            }
+            catch (FfiException ex) when (ex.ErrorCode == -103) { return map; }
         }
     }
 }

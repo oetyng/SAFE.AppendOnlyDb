@@ -7,6 +7,13 @@ using SafeApp.Utilities;
 
 namespace SAFE.AppendOnlyDb.Network
 {
+    public class MdHeadPermissionSettings
+    {
+        // At least Read-permissions needed, if any permissions are given for MdHead (since the MdHeads can't be accessed otherwise).
+        public Dictionary<byte[], PermissionSet> AppContainerPermissions { get; set; } = new Dictionary<byte[], PermissionSet>();
+        public Dictionary<byte[], PermissionSet> MdHeadPermissions { get; set; } = new Dictionary<byte[], PermissionSet>();
+    }
+
     internal class MdHeadManager
     {
         static readonly string MD_CONTAINER_KEY = "md_container";
@@ -17,16 +24,18 @@ namespace SAFE.AppendOnlyDb.Network
         readonly ulong _protocol;
         readonly INetworkDataOps _dataOps;
         readonly IMdNodeFactory _nodeFactory;
+        readonly MdHeadPermissionSettings _permissions;
 
         MdContainer _mdContainer;
         ulong _mdContainerVersion;
 
-        public MdHeadManager(INetworkDataOps dataOps, IMdNodeFactory nodeFactory, string appId, ulong protocol)
+        public MdHeadManager(INetworkDataOps dataOps, IMdNodeFactory nodeFactory, string appId, ulong protocol, MdHeadPermissionSettings permissions = null)
         {
             APP_CONTAINER_PATH = $"apps/{appId}";
             _protocol = protocol;
             _dataOps = dataOps;
             _nodeFactory = nodeFactory;
+            _permissions = permissions ?? new MdHeadPermissionSettings();
         }
 
         public async Task InitializeManager()
@@ -45,6 +54,14 @@ namespace SAFE.AppendOnlyDb.Network
                 {
                     await _dataOps.Session.MDataEntryActions.InsertAsync(appContEntryActionsH, dbIdCipherBytes, dbCipherBytes);
                     await _dataOps.Session.MData.MutateEntriesAsync(appContainer, appContEntryActionsH); // <----------------------------------------------    Commit ------------------------
+                }
+
+                // Set Permissions
+                var version = await _dataOps.Session.MData.GetVersionAsync(appContainer);
+                foreach (var pair in _permissions.AppContainerPermissions)
+                {
+                    var userSignKeyH = await _dataOps.Session.Crypto.SignPubKeyNewAsync(pair.Key);
+                    await _dataOps.Session.MData.SetUserPermissionsAsync(appContainer, userSignKeyH, pair.Value, ++version);
                 }
             }
             else
@@ -73,12 +90,19 @@ namespace SAFE.AppendOnlyDb.Network
                 using (var appSignPkH = await _dataOps.Session.Crypto.AppPubSignKeyAsync())
                     await _dataOps.Session.MDataPermissions.InsertAsync(permissionsHandle, appSignPkH, _dataOps.GetFullPermissions());
 
+                // Set Permissions
+                foreach (var pair in _permissions.MdHeadPermissions)
+                {
+                    var userSignKeyH = await _dataOps.Session.Crypto.SignPubKeyNewAsync(pair.Key);
+                    await _dataOps.Session.MDataPermissions.InsertAsync(permissionsHandle, userSignKeyH, pair.Value);
+                }
+
                 // New mdHead
                 var mdInfo = await _dataOps.CreateEmptyRandomPrivateMd(permissionsHandle, DataProtocol.DEFAULT_AD_PROTOCOL); // TODO: DataProtocol.MD_HEAD);
-                var location = new MdLocator(mdInfo.Name, mdInfo.TypeTag, mdInfo.EncKey, mdInfo.EncNonce);
+                var locator = new MdLocator(mdInfo.Name, mdInfo.TypeTag, mdInfo.EncKey, mdInfo.EncNonce);
 
                 // add mdHead to mdContainer
-                _mdContainer.MdLocators[mdId] = location;
+                _mdContainer.MdLocators[mdId] = locator;
 
                 // Finally update App Container with newly serialized mdContainer
                 var serializedMdContainer = _mdContainer.Json();
@@ -93,16 +117,10 @@ namespace SAFE.AppendOnlyDb.Network
 
                 ++_mdContainerVersion;
 
-                var mdResult = await _nodeFactory.LocateAsync(location);
+                var mdResult = await _nodeFactory.LocateAsync(locator);
                 return new MdHead(mdResult.Value, mdId);
             }
         }
-
-        //public Task<IMdNode> CreateNewMdNode(MdMetadata meta, ulong protocol) 
-        //    => _nodeFactory.CreateNewMdNodeAsync(meta, _dataOps.Session, protocol);
-
-        //public Task<Result<IMdNode>> LocateMdNode(MdLocator location) 
-        //    => _nodeFactory.LocateAsync(location, _dataOps.Session);
 
         async Task<bool> ExistsManagerAsync()
         {

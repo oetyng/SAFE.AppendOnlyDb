@@ -15,10 +15,7 @@ namespace SAFE.AppendOnlyDb.Tests
         [TestInitialize]
         public async Task TestInitialize()
         {
-            await Init();
-            var store = _fixture.GetImdStore();
-            var snapshotter = new Snapshotter<int>(store, SnapshotFunc); ;
-            _fixture.SetSnapshotter(snapshotter);
+            await Init((store) => new Snapshotter<int>(store, SnapshotFunc));
         }
 
         [TestMethod]

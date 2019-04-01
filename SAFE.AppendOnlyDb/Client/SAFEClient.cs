@@ -1,29 +1,27 @@
-﻿using SAFE.AppendOnlyDb.Network;
-using System;
+﻿using SAFE.AppendOnlyDb;
+using SAFE.AppendOnlyDb.Factories;
+using SAFE.AppendOnlyDb.Network;
 using System.Threading.Tasks;
 
 namespace SAFE.Data.Client
 {
-    public class SAFEClient : IStorageClient
+    public class SAFEClient
     {
-        readonly SafeApp.Session _session;
         readonly string _appId;
+        readonly INetworkDataOps _networkDataOps;
+        readonly StreamDbFactory _dbFactory;
 
-        static Func<SafeApp.Session, string, string, Task<object>> _factory;
-
-        public SAFEClient(SafeApp.Session session, string appId)
+        public SAFEClient(string appId, INetworkDataOps networkDataOps, StreamDbFactory dbFactory)
         {
-            _session = session;
             _appId = appId;
+            _networkDataOps = networkDataOps;
+            _dbFactory = dbFactory;
         }
 
-        public static void SetFactory(Func<SafeApp.Session, string, string, Task<object>> factory)
-            => _factory = factory;
-
-        public async Task<T> GetOrAddDbAsync<T>(string dbId)
-            => ((Result<T>)await _factory(_session, _appId, dbId)).Value;
+        public Task<Result<IStreamDb>> GetOrAddDbAsync(string dbId, MdHeadPermissionSettings permissionSettings = null)
+            => _dbFactory.CreateForApp(_appId, dbId, permissionSettings);
 
         public IImDStore GetImDStore()
-            => new ImDStore(new NetworkDataOps(_session));
+            => new ImDStore(_networkDataOps);
     }
 }

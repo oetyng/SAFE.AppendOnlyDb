@@ -18,9 +18,9 @@ namespace SAFE.AppendOnlyDb.Factories
             _streamCollectionFactory = new StreamCollectionFactory(NodeFactory, new DataTreeFactory(NodeFactory));
         }
 
-        public async Task<Result<IStreamDb>> CreateForApp(string appId, string dbId)
+        public async Task<Result<IStreamDb>> CreateForApp(string appId, string dbId, MdHeadPermissionSettings permissionSettings = null)
         {
-            var manager = new MdHeadManager(_dataOps, NodeFactory, appId, DataProtocol.DEFAULT_AD_PROTOCOL);
+            var manager = new MdHeadManager(_dataOps, NodeFactory, appId, DataProtocol.DEFAULT_AD_PROTOCOL, permissionSettings);
             await manager.InitializeManager();
             var streamDbHead = await manager.GetOrAddHeadAsync(dbId);
             var dbResult = await GetOrAddAsync(streamDbHead);

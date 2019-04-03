@@ -4,8 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SAFE.AppendOnlyDb.Snapshots;
-using SAFE.AppendOnlyDb.Utils;
 using SAFE.Data;
+using SAFE.Data.Utils;
 
 namespace SAFE.AppendOnlyDb.Tests
 {
@@ -15,10 +15,7 @@ namespace SAFE.AppendOnlyDb.Tests
         [TestInitialize]
         public async Task TestInitialize()
         {
-            await Init();
-            var store = _fixture.GetImdStore();
-            var snapshotter = new Snapshotter<int>(store, SnapshotFunc); ;
-            _fixture.SetSnapshotter(snapshotter);
+            await Init((store) => new Snapshotter<int>(store, SnapshotFunc));
         }
 
         [TestMethod]

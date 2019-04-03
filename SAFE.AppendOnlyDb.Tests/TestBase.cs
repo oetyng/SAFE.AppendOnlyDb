@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Threading.Tasks;
 using SAFE.AppendOnlyDb.Factories;
+using SAFE.AppendOnlyDb.Network;
 using SAFE.AppendOnlyDb.Snapshots;
+using SAFE.MockAuthClient;
 using SAFE.Data.Client;
-using SAFE.Data.Client.Auth;
 
 namespace SAFE.AppendOnlyDb.Tests
 {
@@ -11,45 +12,33 @@ namespace SAFE.AppendOnlyDb.Tests
     {
         internal NetworkFixture _fixture;
 
-        protected Task Init(bool inMem = true, bool mock = true)
+        protected Task Init(Func<IImDStore, Snapshotter> snapShotterFactory = null, bool inMem = true, bool mock = true)
         {
             _fixture = new NetworkFixture();
-            return _fixture.InitClient(inMem, mock);
+            return _fixture.InitSession(snapShotterFactory, inMem, mock);
         }
-
-        protected void SetSnapshotter(Snapshotter snapshotter)
-            => _fixture.SetSnapshotter(snapshotter);
     }
 
     internal class NetworkFixture
     {
         readonly string _appId = "testapp";
-        Snapshotter _snapshotter;
-        Network.IMdNodeFactory _nodeFactory;
+        INetworkDataOps _networkDataOps;
+        IMdNodeFactory _nodeFactory;
         DataTreeFactory _dataTreeFactory;
-        IStorageClient _client;
+        StreamDbFactory _dbFactory;
 
-        internal async Task InitClient(bool inMem = true, bool mock = true)
+        internal async Task InitSession(Func<IImDStore, Snapshotter> snapShotterFactory, bool inMem = true, bool mock = true)
         {
-            SAFEClient.SetFactory(async (sess, app, db) => await CreateForApp(sess, app, db));
+            if (!mock) throw new InvalidOperationException("Not testing against live networks.");
 
-            var clientFactory = new ClientFactory(GetAppInfo(), (session, appId) => new SAFEClient(session, appId));
+            var mockClient = new CredentialAuth(_appId, inMem);
+            var session = (await mockClient.AuthenticateAsync()).Value;
+            _networkDataOps = new NetworkDataOps(session);
 
-            if (mock)
-                _client = await clientFactory.GetMockNetworkClient(Credentials.Random, inMem);
-            else // live network
-                throw new NotImplementedException("Live network not yet implemented.");
-        }
-
-        internal void SetSnapshotter(Snapshotter snapshotter)
-            => _snapshotter = snapshotter;
-
-        async Task<Data.Result<IStreamDb>> CreateForApp(SafeApp.Session session, string appId, string dbId)
-        {
-            var factory = new StreamDbFactory(new Network.NetworkDataOps(session), _snapshotter);
-            _nodeFactory = factory.NodeFactory;
-            _dataTreeFactory = new DataTreeFactory(factory.NodeFactory);
-            return await factory.CreateForApp(appId, dbId);
+            var snapshotter = snapShotterFactory == null ? null : snapShotterFactory(GetImdStore());
+            _dbFactory = new StreamDbFactory(_networkDataOps, snapshotter);
+            _nodeFactory = _dbFactory.NodeFactory;
+            _dataTreeFactory = new DataTreeFactory(_nodeFactory);
         }
 
         internal Task<IMdNode> CreateNodeAsync()
@@ -58,36 +47,27 @@ namespace SAFE.AppendOnlyDb.Tests
         internal async Task<MutableCollection<T>> CreateCollection<T>()
             => new MutableCollection<T>(await GetValueADAsync(), _dataTreeFactory);
 
-        internal async Task<IValueAD> GetValueADAsync()
+        internal async Task<IValueAD> GetValueADAsync(MdHeadPermissionSettings permissionSettings = null)
         {
-            var db = await GetDatabase("theDb");
+            var db = await GetDatabase("theDb", permissionSettings);
             var mdHead = await CreateNodeAsync();
-            return new DataTree(mdHead, (s) => throw new ArgumentOutOfRangeException("Can only add 1k items to this collection."));
+            return new DataTree(mdHead, (s) => throw new ArgumentOutOfRangeException("Can only add 999k items to this collection."));
         }
 
-        internal async Task<IStreamAD> GetStreamADAsync(string streamKey = "theStream")
+        internal async Task<IStreamAD> GetStreamADAsync(string streamKey = "theStream", MdHeadPermissionSettings permissionSettings = null)
         {
-            var db = await GetDatabase("theDb");
+            var db = await GetDatabase("theDb", permissionSettings);
             await db.AddStreamAsync(streamKey);
             return (await db.GetStreamAsync(streamKey)).Value;
         }
 
-        AppInfo GetAppInfo()
-            => new AppInfo
-            {
-                Id = _appId,
-                Name = "testapp",
-                Scope = string.Empty,
-                Vendor = "test"
-            };
-
-        internal Authentication GetAuth()
-            => new Authentication(GetAppInfo());
-
-        internal Task<IStreamDb> GetDatabase(string dbName)
-            => _client.GetOrAddDbAsync<IStreamDb>(dbName);
+        internal async Task<IStreamDb> GetDatabase(string dbName, MdHeadPermissionSettings permissionSettings = null)
+        {
+            var res = await _dbFactory.CreateForApp(_appId, dbName, permissionSettings);
+            return res.Value;
+        }
 
         internal IImDStore GetImdStore()
-            => _client.GetImDStore();
+            => new ImDStore(_networkDataOps);
     }
 }

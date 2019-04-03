@@ -5,19 +5,25 @@
     <LangVersion>8.0</LangVersion>
     <IsPackable>false</IsPackable>
     <DefineConstants>TRACE;SAFE_APP_MOCK</DefineConstants>
-    <Platforms>AnyCPU;x64</Platforms>
+    <Platforms>x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MaidSafe.SafeApp" Version="0.2.0" />
+    <PackageReference Include="MaidSafe.SafeApp" Version="0.2.1" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.9.0" />
     <PackageReference Include="MSTest.TestAdapter" Version="1.3.2" />
     <PackageReference Include="MSTest.TestFramework" Version="1.3.2" />
-    <PackageReference Include="SAFE.AuthClient" Version="0.1.0" />
+    <PackageReference Include="SAFE.MockAuthClient" Version="0.1.0-alpha.2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\SAFE.AppendOnlyDb\SAFE.AppendOnlyDb.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="SafeApp.MockAuthBindings">
+      <HintPath>..\..\..\..\.nuget\packages\maidsafe.safeapp\0.2.0\build\netcoreapp1.0\SafeApp.MockAuthBindings.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
 </Project>

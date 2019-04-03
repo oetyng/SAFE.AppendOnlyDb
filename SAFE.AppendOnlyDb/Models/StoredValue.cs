@@ -1,5 +1,5 @@
 ﻿using Newtonsoft.Json;
-using SAFE.AppendOnlyDb.Utils;
+using SAFE.Data.Utils;
 
 namespace SAFE.AppendOnlyDb
 {

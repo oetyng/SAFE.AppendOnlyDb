@@ -1,6 +1,7 @@
-﻿using SAFE.AppendOnlyDb.Utils;
-using SAFE.Data.Client;
+﻿using SAFE.Data.Client;
+using SAFE.Data.Utils;
 using SafeApp.Utilities;
+using System;
 using System.Threading.Tasks;
 
 namespace SAFE.AppendOnlyDb.Network
@@ -10,16 +11,14 @@ namespace SAFE.AppendOnlyDb.Network
         INetworkDataOps _networkOps;
 
         public ImDStore(INetworkDataOps networkOps)
-        {
-            _networkOps = networkOps;
-        }
+            => _networkOps = networkOps;
 
         // While map size is too large for an MD entry
         // store the map as ImD.
         public async Task<byte[]> StoreImDAsync(byte[] payload)
         {
-            if (payload.Length == 0)
-                throw new System.ArgumentException("Payload cannot be empty.");
+            if (payload == null) throw new ArgumentNullException(nameof(payload));
+            if (payload.Length == 0) throw new ArgumentException("Payload cannot be empty.");
 
             var map = await _networkOps.StoreImmutableData(payload.Compress());
             if (map.Length < 1000)
@@ -31,6 +30,8 @@ namespace SAFE.AppendOnlyDb.Network
         // the payload is a datamap.
         public async Task<byte[]> GetImDAsync(byte[] map)
         {
+            if (map == null) throw new ArgumentNullException(nameof(map));
+
             try
             {
                 var payload = await _networkOps.GetImmutableData(map);

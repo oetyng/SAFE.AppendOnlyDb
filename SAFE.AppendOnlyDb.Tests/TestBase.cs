@@ -51,7 +51,7 @@ namespace SAFE.AppendOnlyDb.Tests
         {
             var db = await GetDatabase("theDb", permissionSettings);
             var mdHead = await CreateNodeAsync();
-            return new DataTree(mdHead, (s) => throw new ArgumentOutOfRangeException("Can only add 1k items to this collection."));
+            return new DataTree(mdHead, (s) => throw new ArgumentOutOfRangeException("Can only add 999k items to this collection."));
         }
 
         internal async Task<IStreamAD> GetStreamADAsync(string streamKey = "theStream", MdHeadPermissionSettings permissionSettings = null)

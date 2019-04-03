@@ -48,7 +48,7 @@ namespace SAFE.AppendOnlyDb.Network
 
                 var mdContainerRoot = await GetNewMdNodeAsync();
                 var f = new Factories.DataTreeFactory(_nodeFactory);
-                _mdContainerSource = await f.CreateAsync((s) => null); // no expansion func, means we can only create 999 databases with this account.
+                _mdContainerSource = await f.CreateAsync((s) => throw new ArgumentOutOfRangeException("Can only add 999k items to this collection.")); // no expansion func, means we can only create 999 databases with this account.
                 var serializedDbContainer = _mdContainerSource.MdLocator.Json();
 
                 // Insert a serialized mdContainer into App Container
@@ -151,7 +151,7 @@ namespace SAFE.AppendOnlyDb.Network
             var locator = mdContainerJson.Parse<MdLocator>();
 
             var dataTreeFactory = new Factories.DataTreeFactory(_nodeFactory);
-            _mdContainerSource = (IValueAD)await dataTreeFactory.LocateAsync(locator, (s) => null);
+            _mdContainerSource = (IValueAD)await dataTreeFactory.LocateAsync(locator, (s) => throw new ArgumentOutOfRangeException("Can only add 999k items to this collection."));
             var value = await _mdContainerSource.GetValueAsync();
             if (value.HasValue)
                 return value.Value.Parse<MdContainer>();

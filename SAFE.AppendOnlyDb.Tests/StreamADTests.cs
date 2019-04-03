@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SAFE.Data;
+using static SAFE.Data.Utils.EnumerableExt;
 
 namespace SAFE.AppendOnlyDb.Tests
 {
@@ -127,7 +128,7 @@ namespace SAFE.AppendOnlyDb.Tests
                 .ToListAsync();
 
             // Assert
-            Assert.IsTrue(Enumerable.SequenceEqual(range, Utils.EnumerableExt.LongRange(indexStart, selectCount)));
+            Assert.IsTrue(Enumerable.SequenceEqual(range, LongRange(indexStart, selectCount)));
         }
 
         [TestMethod]
@@ -174,7 +175,7 @@ namespace SAFE.AppendOnlyDb.Tests
                 .ToListAsync();
 
             // Assert
-            Assert.IsTrue(Enumerable.SequenceEqual(range, Utils.EnumerableExt.LongRange(indexStart, selectCount)));
+            Assert.IsTrue(Enumerable.SequenceEqual(range, LongRange(indexStart, selectCount)));
         }
 
         [TestMethod]
@@ -227,7 +228,7 @@ namespace SAFE.AppendOnlyDb.Tests
             Assert.AreEqual(addCount, forwardEvents.Count);
             var fwdVersions = forwardEvents.Select(c => c.Item1);
             var fwdValues = forwardEvents.Select(c => c.Item2.Parse<int>());
-            Assert.IsTrue(Enumerable.SequenceEqual(fwdVersions, Utils.EnumerableExt.LongRange(0, (ulong)addCount)));
+            Assert.IsTrue(Enumerable.SequenceEqual(fwdVersions, LongRange(0, (ulong)addCount)));
             Assert.IsTrue(Enumerable.SequenceEqual(fwdValues, Enumerable.Range(0, (int)addCount)));
 
             // Assert 2: Backwards

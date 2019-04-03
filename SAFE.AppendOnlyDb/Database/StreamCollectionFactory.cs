@@ -14,7 +14,7 @@ namespace SAFE.AppendOnlyDb.Factories
             _dataTreeFactory = dataTreeFactory;
         }
 
-        public async Task<IStreamCollection> GetOrAddDataCollectionAsync(IValueAD dataDbRoot)
+        public async Task<IStreamCollection> GetOrAddCollectionAsync(IValueAD dataDbRoot)
         {
             IMdNode typeStoreHead;
             var typeStoreResult = await dataDbRoot.GetValueAsync().ConfigureAwait(false);

@@ -15,14 +15,4 @@ namespace SAFE.AppendOnlyDb.Utils
                        new KeyValuePair<T1, T2>(pair.Key, await pair.Value)));
         }
     }
-
-    public static class EnumerableExt
-    {
-        public static IEnumerable<ulong> LongRange(ulong start, ulong count)
-        {
-            var end = start + count;
-            for (var current = start; current < end; ++current)
-                yield return current;
-        }
-    }
 }

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using SAFE.AppendOnlyDb.Utils;
+using SAFE.Data.Utils;
 using SafeApp.Utilities;
 
 namespace SAFE.AppendOnlyDb.Network

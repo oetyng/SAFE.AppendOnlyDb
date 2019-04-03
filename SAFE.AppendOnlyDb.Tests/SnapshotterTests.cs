@@ -4,8 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SAFE.AppendOnlyDb.Snapshots;
-using SAFE.AppendOnlyDb.Utils;
 using SAFE.Data;
+using SAFE.Data.Utils;
 
 namespace SAFE.AppendOnlyDb.Tests
 {

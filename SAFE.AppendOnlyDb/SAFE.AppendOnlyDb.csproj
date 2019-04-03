@@ -6,13 +6,13 @@
     <DefineConstants>TRACE</DefineConstants>
     <Platforms>x64</Platforms>
     <PackageTags>maidsafe safenetwork oetyng decentralized database eventstore</PackageTags>
-    <Description>EventStore (light) database on SAFENetwork (Safe Access For Everyone) - a decentralized, secure and anonymous data storage network.</Description>
+    <Description>EventStore database on SAFENetwork (Safe Access For Everyone) - a decentralized and autonomous data storage network.</Description>
     <Authors>oetyng</Authors>
     <Company>oetyng</Company>
     <Copyright>2019 oetyng</Copyright>
     <RepositoryUrl>https://github.com/oetyng/SAFE.AppendOnlyDb</RepositoryUrl>
     <PackageLicenseUrl>https://licenses.nuget.org/MIT</PackageLicenseUrl>
-    <Version>0.1.0-alpha.2</Version>
+    <Version>0.1.0-alpha.4</Version>
   </PropertyGroup>
 
   <ItemGroup>

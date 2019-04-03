@@ -25,9 +25,10 @@ namespace SAFE.AppendOnlyDb.Network
         readonly INetworkDataOps _dataOps;
         readonly IMdNodeFactory _nodeFactory;
         readonly MdHeadPermissionSettings _permissions;
-
+        IValueAD _mdContainerSource;
         MdContainer _mdContainer;
-        ulong _mdContainerVersion;
+
+        
 
         public MdHeadManager(INetworkDataOps dataOps, IMdNodeFactory nodeFactory, string appId, ulong protocol, MdHeadPermissionSettings permissions = null)
         {
@@ -44,7 +45,11 @@ namespace SAFE.AppendOnlyDb.Network
             {
                 // Create new md head container
                 _mdContainer = new MdContainer();
-                var serializedDbContainer = _mdContainer.Json();
+
+                var mdContainerRoot = await GetNewMdNodeAsync();
+                var f = new Factories.DataTreeFactory(_nodeFactory);
+                _mdContainerSource = await f.CreateAsync((s) => null); // no expansion func, means we can only create 999 databases with this account.
+                var serializedDbContainer = _mdContainerSource.MdLocator.Json();
 
                 // Insert a serialized mdContainer into App Container
                 var appContainer = await _dataOps.Session.AccessContainer.GetMDataInfoAsync(APP_CONTAINER_PATH);
@@ -65,7 +70,7 @@ namespace SAFE.AppendOnlyDb.Network
                 }
             }
             else
-                await LoadDbContainer();
+                _mdContainer = await LoadDbContainer();
         }
 
         public async Task<MdHead> GetOrAddHeadAsync(string mdName)
@@ -84,6 +89,23 @@ namespace SAFE.AppendOnlyDb.Network
                 return new MdHead(mdResult.Value, mdId);
             }
 
+            var newMdResult = await GetNewMdNodeAsync();
+
+             // add mdHead to mdContainer
+             _mdContainer.MdLocators[mdId] = newMdResult.MdLocator;
+
+            var result = await _mdContainerSource.SetAsync(new StoredValue(_mdContainer));
+            if (!result.HasValue)
+            {
+                _mdContainer.MdLocators.Remove(mdId);
+                throw new ArgumentException(result.ErrorMsg);
+            }
+
+            return new MdHead(newMdResult, mdId);
+        }
+
+        async Task<IMdNode> GetNewMdNodeAsync()
+        {
             // Create Permissions
             using (var permissionsHandle = await _dataOps.Session.MDataPermissions.NewAsync())
             {
@@ -101,24 +123,11 @@ namespace SAFE.AppendOnlyDb.Network
                 var mdInfo = await _dataOps.CreateEmptyRandomPrivateMd(permissionsHandle, DataProtocol.DEFAULT_AD_PROTOCOL); // TODO: DataProtocol.MD_HEAD);
                 var locator = new MdLocator(mdInfo.Name, mdInfo.TypeTag, mdInfo.EncKey, mdInfo.EncNonce);
 
-                // add mdHead to mdContainer
-                _mdContainer.MdLocators[mdId] = locator;
-
-                // Finally update App Container with newly serialized mdContainer
-                var serializedMdContainer = _mdContainer.Json();
-                var appContainer = await _dataOps.Session.AccessContainer.GetMDataInfoAsync(APP_CONTAINER_PATH);
-                var mdKeyCipherBytes = await _dataOps.Session.MDataInfoActions.EncryptEntryKeyAsync(appContainer, MD_CONTAINER_KEY_BYTES);
-                var mdCipherBytes = await _dataOps.Session.MDataInfoActions.EncryptEntryValueAsync(appContainer, serializedMdContainer.ToUtfBytes());
-                using (var appContEntryActionsH = await _dataOps.Session.MDataEntryActions.NewAsync())
-                {
-                    await _dataOps.Session.MDataEntryActions.UpdateAsync(appContEntryActionsH, mdKeyCipherBytes, mdCipherBytes, _mdContainerVersion + 1);
-                    await _dataOps.Session.MData.MutateEntriesAsync(appContainer, appContEntryActionsH); // <----------------------------------------------    Commit ------------------------
-                }
-
-                ++_mdContainerVersion;
-
                 var mdResult = await _nodeFactory.LocateAsync(locator);
-                return new MdHead(mdResult.Value, mdId);
+
+                if (!mdResult.HasValue)
+                    throw new ArgumentException(mdResult.ErrorMsg);
+                return mdResult.Value;
             }
         }
 
@@ -137,12 +146,16 @@ namespace SAFE.AppendOnlyDb.Network
             var mdKeyCipherBytes = await _dataOps.Session.MDataInfoActions.EncryptEntryKeyAsync(appContainerInfo, MD_CONTAINER_KEY_BYTES);
             var cipherTxtEntryVal = await _dataOps.Session.MData.GetValueAsync(appContainerInfo, mdKeyCipherBytes);
 
-            _mdContainerVersion = cipherTxtEntryVal.Item2;
-
             var plainTxtEntryVal = await _dataOps.Session.MDataInfoActions.DecryptAsync(appContainerInfo, cipherTxtEntryVal.Item1);
             var mdContainerJson = plainTxtEntryVal.ToUtfString();
-            _mdContainer = mdContainerJson.Parse<MdContainer>();
-            return _mdContainer;
+            var locator = mdContainerJson.Parse<MdLocator>();
+
+            var dataTreeFactory = new Factories.DataTreeFactory(_nodeFactory);
+            _mdContainerSource = (IValueAD)await dataTreeFactory.LocateAsync(locator, (s) => null);
+            var value = await _mdContainerSource.GetValueAsync();
+            if (value.HasValue)
+                return value.Value.Parse<MdContainer>();
+            return new MdContainer();
         }
 
         class MdContainer

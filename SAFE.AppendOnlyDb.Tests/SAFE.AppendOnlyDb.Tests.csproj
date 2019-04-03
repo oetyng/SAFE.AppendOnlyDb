@@ -20,4 +20,10 @@
     <ProjectReference Include="..\SAFE.AppendOnlyDb\SAFE.AppendOnlyDb.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="SafeApp.MockAuthBindings">
+      <HintPath>..\..\..\..\.nuget\packages\maidsafe.safeapp\0.2.0\build\netcoreapp1.0\SafeApp.MockAuthBindings.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
 </Project>

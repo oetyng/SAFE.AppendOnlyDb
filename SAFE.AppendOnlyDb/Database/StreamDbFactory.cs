@@ -30,7 +30,7 @@ namespace SAFE.AppendOnlyDb.Factories
         async Task<Result<IStreamDb>> GetOrAddAsync(MdHead streamDbHead)
         {
             var streamDbRoot = new DataTree(streamDbHead.Md, (s) => throw new ArgumentOutOfRangeException("Can only add 999 items to this collection."));
-            var streamCollection = await _streamCollectionFactory.GetOrAddDataCollectionAsync(streamDbRoot);
+            var streamCollection = await _streamCollectionFactory.GetOrAddCollectionAsync(streamDbRoot);
 
             var db = new StreamDb(streamCollection, NodeFactory);
 

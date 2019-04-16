@@ -8,7 +8,7 @@ using SafeApp.Utilities;
 
 namespace SAFE.AppendOnlyDb.Network
 {
-    internal class NetworkDataOps : INetworkDataOps
+    public class NetworkDataOps : INetworkDataOps
     {
         public Session Session { get; }
 

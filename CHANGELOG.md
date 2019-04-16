@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha.4] - 2019-04-16
+### Changed
+- NetworkDataOps public access modifier.
+
 ## [0.1.0-alpha.3] - 2019-04-04
 ### Added
 - Sharing of MdHeads (and entire data trees) by implementing MdHeadPermissionSettings to be passed into MdHeadManager.
@@ -54,7 +58,8 @@ Following are moved to SAFE.Data.Common:
 ### Added
 - Migrated project files from old repo.
 
-[Unreleased]: https://github.com/oetyng/SAFE.AppendOnlyDb/compare/v0.1.0-alpha.3...dev-v0.1.0-alpha.4
-[0.1.0-alpha.3]: https://github.com/oetyng/SAFE.AppendOnlyDb/compare/v.0.1.0-alpha.2...dev-v.0.1.0-alpha.3
-[0.1.0-alpha.2]: https://github.com/oetyng/SAFE.AppendOnlyDb/compare/v0.1.0-alpha.1...dev-v.0.1.0-alpha.2
+[Unreleased]: https://github.com/oetyng/SAFE.AppendOnlyDb/compare/dev-v.0.1.0-alpha.4...dev-v0.1.0-alpha.5
+[0.1.0-alpha.4]: https://github.com/oetyng/SAFE.AppendOnlyDb/compare/dev-v.0.1.0-alpha.3...dev-v.0.1.0-alpha.4
+[0.1.0-alpha.3]: https://github.com/oetyng/SAFE.AppendOnlyDb/compare/dev-v.0.1.0-alpha.2...dev-v.0.1.0-alpha.3
+[0.1.0-alpha.2]: https://github.com/oetyng/SAFE.AppendOnlyDb/compare/dev-v0.1.0-alpha.1...dev-v.0.1.0-alpha.2
 [0.1.0-alpha.1]: https://github.com/oetyng/SAFE.AppendOnlyDb/releases/tag/v0.1.0-alpha.1

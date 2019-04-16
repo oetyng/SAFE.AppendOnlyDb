@@ -14,7 +14,7 @@ namespace SAFE.AppendOnlyDb
         readonly DataTreeFactory _dataTreeFactory;
 
         protected readonly ConcurrentDictionary<string, IStreamAD> _dataTreeCache = new ConcurrentDictionary<string, IStreamAD>();
-        protected ConcurrentDictionary<string, MdLocator> _dataTreeAddresses = new ConcurrentDictionary<string, MdLocator>();
+        protected ConcurrentDictionary<string, MdLocator> _dataTreeAddresses;
 
         public StreamDb(IStreamCollection streams, Network.IMdNodeFactory nodeFactory)
         { 

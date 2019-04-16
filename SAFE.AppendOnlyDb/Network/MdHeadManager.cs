@@ -151,7 +151,8 @@ namespace SAFE.AppendOnlyDb.Network
             var locator = mdContainerJson.Parse<MdLocator>();
 
             var dataTreeFactory = new Factories.DataTreeFactory(_nodeFactory);
-            _mdContainerSource = (IValueAD)await dataTreeFactory.LocateAsync(locator, (s) => throw new ArgumentOutOfRangeException("Can only add 999k items to this collection."));
+            var result = await dataTreeFactory.LocateAsync(locator, (s) => throw new ArgumentOutOfRangeException("Can only add 999k items to this collection."));
+            _mdContainerSource = result.Value; // makes sense to check for HasValue?
             var value = await _mdContainerSource.GetValueAsync();
             if (value.HasValue)
                 return value.Value.Parse<MdContainer>();

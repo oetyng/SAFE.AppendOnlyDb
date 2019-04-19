@@ -147,6 +147,7 @@ namespace SAFE.AppendOnlyDb.Network
                     {
                         SnapshotMap = lastNode.Snapshot,
                         NewEvents = FindRangeAsync(lastNode.StartIndex, (ulong)sv.Value)
+                            .OrderBy(c => c.Item1)
                     };
                     return Result.OK(reading);
                 default:

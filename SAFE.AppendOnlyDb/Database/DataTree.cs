@@ -46,10 +46,10 @@ namespace SAFE.AppendOnlyDb
         IAsyncEnumerable<(ulong, StoredValue)> IStreamAD.GetRangeAsync(ulong from, ulong to)
             => _head.FindRangeAsync(from, to);
 
-        public IOrderedAsyncEnumerable<(ulong, StoredValue)> ReadForwardFromAsync(ulong from)
+        public IAsyncEnumerable<(ulong, StoredValue)> ReadForwardFromAsync(ulong from)
             => _head.ReadToEndAsync(from).OrderBy(c => c.Item1);
 
-        public IOrderedAsyncEnumerable<(ulong, StoredValue)> ReadBackwardsFromAsync(ulong from)
+        public IAsyncEnumerable<(ulong, StoredValue)> ReadBackwardsFromAsync(ulong from)
             => _head.FindRangeAsync(0, from).OrderByDescending(c => c.Item1);
 
         /// <summary>

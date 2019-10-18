@@ -137,13 +137,22 @@ namespace SAFE.AppendOnlyDb.Network
             if (!lastNodeRes.HasValue)
                 return lastNodeRes.CastError<IMdNode, Snapshots.SnapshotReading>();
             var lastNode = lastNodeRes.Value;
-            var since = FindRangeAsync(lastNode.StartIndex, (ulong)lastNode.Version.Value);
-            var reading = new Snapshots.SnapshotReading
+
+            switch (lastNode.Version)
             {
-                SnapshotMap = lastNode.Snapshot,
-                NewEvents = since
-            };
-            return Result.OK(reading);
+                case NoVersion nv:
+                    return new DataNotFound<Snapshots.SnapshotReading>("No data in the stream.");
+                case SpecificVersion sv:
+                    var reading = new Snapshots.SnapshotReading
+                    {
+                        SnapshotMap = lastNode.Snapshot,
+                        NewEvents = FindRangeAsync(lastNode.StartIndex, (ulong)sv.Value)
+                            .OrderBy(c => c.Item1)
+                    };
+                    return Result.OK(reading);
+                default:
+                    return new ArgumentOutOfRange<Snapshots.SnapshotReading>(nameof(lastNode.Version));
+            }
         }
 
 

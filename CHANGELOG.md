@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha.5] - 2019-10-18
+### Changed
+- Updated dependencies to fix failing tests
+- Fix: SnapshotReading ordering of new events.
+- Expand when expecting version bugfix: MdNode version when Count == 0 and StartIndex > 0 is correctly set to SpecificVersion of (NextVersion - 1), instead of NoVersion.
+- MdHeadManager fixed incorrect casting. StreamDb fixed non-accessible initialization.
+- MdNode ReadFromSnapshot handles NoVersion case.
+
 ## [0.1.0-alpha.4] - 2019-04-16
 ### Changed
 - NetworkDataOps public access modifier.
@@ -58,8 +66,9 @@ Following are moved to SAFE.Data.Common:
 ### Added
 - Migrated project files from old repo.
 
-[Unreleased]: https://github.com/oetyng/SAFE.AppendOnlyDb/compare/dev-v.0.1.0-alpha.4...dev-v0.1.0-alpha.5
-[0.1.0-alpha.4]: https://github.com/oetyng/SAFE.AppendOnlyDb/compare/dev-v.0.1.0-alpha.3...dev-v.0.1.0-alpha.4
+[Unreleased]: https://github.com/oetyng/SAFE.AppendOnlyDb/compare/dev-v0.1.0-alpha.5...dev-v0.1.0-alpha.6
+[0.1.0-alpha.5]: https://github.com/oetyng/SAFE.AppendOnlyDb/compare/dev-v0.1.0-alpha.4...dev-v0.1.0-alpha.5
+[0.1.0-alpha.4]: https://github.com/oetyng/SAFE.AppendOnlyDb/compare/dev-v.0.1.0-alpha.3...dev-v0.1.0-alpha.4
 [0.1.0-alpha.3]: https://github.com/oetyng/SAFE.AppendOnlyDb/compare/dev-v.0.1.0-alpha.2...dev-v.0.1.0-alpha.3
 [0.1.0-alpha.2]: https://github.com/oetyng/SAFE.AppendOnlyDb/compare/dev-v0.1.0-alpha.1...dev-v.0.1.0-alpha.2
 [0.1.0-alpha.1]: https://github.com/oetyng/SAFE.AppendOnlyDb/releases/tag/v0.1.0-alpha.1

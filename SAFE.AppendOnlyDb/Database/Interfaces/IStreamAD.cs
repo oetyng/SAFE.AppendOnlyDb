@@ -20,8 +20,8 @@ namespace SAFE.AppendOnlyDb
         /// <returns><see cref="SnapshotReading"/></returns>
         Task<Result<Snapshots.SnapshotReading>> ReadFromSnapshot();
 
-        IOrderedAsyncEnumerable<(ulong, StoredValue)> ReadForwardFromAsync(ulong from);
-        IOrderedAsyncEnumerable<(ulong, StoredValue)> ReadBackwardsFromAsync(ulong from);
+        IAsyncEnumerable<(ulong, StoredValue)> ReadForwardFromAsync(ulong from);
+        IAsyncEnumerable<(ulong, StoredValue)> ReadBackwardsFromAsync(ulong from);
         IAsyncEnumerable<(ulong, StoredValue)> GetRangeAsync(ulong from, ulong to);
 
         IAsyncEnumerable<StoredValue> GetAllValuesAsync();

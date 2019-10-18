@@ -25,7 +25,7 @@ namespace SAFE.AppendOnlyDb.Network
         public int Level => _metadata.Level;
         public MdType Type => Level > 0 ? MdType.Pointers : MdType.Values;
         public MdLocator MdLocator => _dataOps.MdLocator;
-        public ExpectedVersion Version => Count == 0 ? ExpectedVersion.None : ExpectedVersion.Specific(NextVersion - 1);
+        public ExpectedVersion Version => Count == 0 && StartIndex == 0 ? ExpectedVersion.None : ExpectedVersion.Specific(NextVersion - 1);
 
         public IMdNodeFactory NodeFactory => _dataOps.NodeFactory;
 

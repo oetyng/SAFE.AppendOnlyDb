@@ -11,6 +11,6 @@ namespace SAFE.AppendOnlyDb.Network.AD
         /// Returns an error if duplicate entries are present.
         /// If the specified `next_unused_index` does not match 
         /// the length of the AD, an error will be returned.
-        Task<Result<T>> AppendAsync<T>(List<Entry> entries, Index nextUnusedIndex);
+        Task<Result<Index>> AppendAsync(List<Entry> entries, Index nextUnusedIndex);
     }
 }

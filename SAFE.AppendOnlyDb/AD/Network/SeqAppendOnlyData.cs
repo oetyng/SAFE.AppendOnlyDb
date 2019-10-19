@@ -17,12 +17,12 @@ namespace SAFE.AppendOnlyDb.Network.AD
         public SeqAppendOnlyDataMock(Address address)
             => _address = address;
 
-        public Task<Result<T>> AppendAsync<T>(List<Entry> entries, Index nextUnusedIndex)
+        public Task<Result<Index>> AppendAsync(List<Entry> entries, Index nextUnusedIndex)
         {
             if (nextUnusedIndex.Value != (ulong)_entries.Count)
-                return Task.FromResult((Result<T>)new VersionMismatch<T>());
+                return Task.FromResult((Result<Index>)new VersionMismatch<Index>());
             _entries.AddRange(entries);
-            return Task.FromResult(Result.OK(default(T)));
+            return Task.FromResult(Result.OK(nextUnusedIndex.Next));
         }
 
         public Result<Index> AppendOwner(Owner owner, Index nextUnusedIndex)
@@ -42,6 +42,16 @@ namespace SAFE.AppendOnlyDb.Network.AD
         }
 
         public Address GetAddress() => _address;
+
+
+        public Result<Entry> GetEntry(Index index)
+        {
+            var i = (int)index.Value;
+            return _entries.Count > i ?
+                Result.OK(_entries[i]) :
+                new DataNotFound<Entry>();
+        }
+
 
         public List<Entry> GetEntries() => _entries.ToList();
 
@@ -73,7 +83,7 @@ namespace SAFE.AppendOnlyDb.Network.AD
         public Result<Entry> GetLastEntry()
             => _entries.Any() ?
                 Result.OK(_entries.Last()) :
-                Result.Fail<Entry>(-1, "");
+                new DataNotFound<Entry>();
 
         public XorName GetName() => _address.Name;
 
@@ -82,7 +92,7 @@ namespace SAFE.AppendOnlyDb.Network.AD
             var i = (int)index.Value;
             return _owners.Count > i ?
                 Result.OK(_owners[i]) :
-                Result.Fail<Owner>(-1, "");
+                new DataNotFound<Owner>();
         }
 
         public Index GetOwnersIndex()
@@ -100,7 +110,7 @@ namespace SAFE.AppendOnlyDb.Network.AD
             var i = (int)index.Value;
             return _permissions.Count > i ?
                 Result.OK(_permissions[i]) :
-                Result.Fail<Permissions>(-1, "");
+                new DataNotFound<Permissions>();
         }
 
         public Index GetPermissionsIndex()

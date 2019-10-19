@@ -9,7 +9,8 @@ namespace SAFE.AppendOnlyDb.Network.AD
         Task<Result<Index>> AppendAsync(StoredValue value);
         Task<Result<Index>> TryAppendAsync(StoredValue value, ExpectedVersion expectedVersion);
 
-        // Todo: AppendRange / TryAppendRange
+        Task<Result<Index>> AppendRangeAsync(List<StoredValue> value);
+        Task<Result<Index>> TryAppendRangeAsync(List<StoredValue> value, ExpectedVersion expectedVersion);
 
         Task<Result<StoredValue>> GetAtIndexAsync(Index version);
 

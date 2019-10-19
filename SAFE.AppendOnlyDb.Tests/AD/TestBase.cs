@@ -12,7 +12,7 @@ namespace SAFE.AppendOnlyDb.Tests
     {
         internal NetworkFixture_v2 _fixture;
 
-        protected Task Init(Func<IImDStore, Snapshotter> snapShotterFactory = null, bool inMem = true, bool mock = true)
+        protected Task Init(Func<IImDStore_v2, Snapshotter_v2> snapShotterFactory = null, bool inMem = true, bool mock = true)
         {
             _fixture = new NetworkFixture_v2();
             return _fixture.InitSession(snapShotterFactory, inMem, mock);
@@ -22,23 +22,20 @@ namespace SAFE.AppendOnlyDb.Tests
     internal class NetworkFixture_v2
     {
         readonly string _appId = "testapp";
-        // INetworkDataOps _networkDataOps;
+        INetworkDataOps_v2 _networkDataOps;
         StreamDbFactory_v2 _dbFactory;
 
-        internal Task InitSession(Func<IImDStore, Snapshotter> snapShotterFactory, bool inMem = true, bool mock = true)
+        internal Task InitSession(Func<IImDStore_v2, Snapshotter_v2> snapShotterFactory, bool inMem = true, bool mock = true)
         {
             if (!mock) throw new InvalidOperationException("Not testing against live networks.");
 
             // var mockClient = new CredentialAuth(_appId, inMem);
             // var session = (await mockClient.AuthenticateAsync()).Value;
-            // _networkDataOps = new NetworkDataOps(session);
-            // var snapshotter = snapShotterFactory == null ? null : snapShotterFactory(GetImdStore());
-            _dbFactory = new StreamDbFactory_v2(); // StreamDbFactory_v2(_networkDataOps, snapshotter)
+            _networkDataOps = new NetworkDataOps_v2();
+            var snapshotter = snapShotterFactory == null ? null : snapShotterFactory(GetImdStore());
+            _dbFactory = new StreamDbFactory_v2(_networkDataOps, snapshotter);
             return Task.FromResult(0);
         }
-
-        //internal async Task<MutableCollection<T>> CreateCollection<T>()
-        //    => new MutableCollection<T>(await GetValueADAsync(), _dataTreeFactory);
 
         internal async Task<IValueAD_v2> GetValueADAsync()
         {
@@ -59,7 +56,7 @@ namespace SAFE.AppendOnlyDb.Tests
             return res.Value;
         }
 
-        //internal IImDStore GetImdStore()
-        //    => new ImDStore(_networkDataOps);
+        internal IImDStore_v2 GetImdStore()
+            => new ImDStore_v2(_networkDataOps);
     }
 }

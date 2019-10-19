@@ -24,6 +24,9 @@ namespace SAFE.AppendOnlyDb.Network.AD
         /// Returns a value for the given key, if present.
         Result<byte[]> GetValue(byte[] key);
 
+        /// Gets entry at index.
+        Result<Entry> GetEntry(Index index);
+
         /// Returns the last entry, if present.
         Result<Entry> GetLastEntry();
 
@@ -55,10 +58,10 @@ namespace SAFE.AppendOnlyDb.Network.AD
         /// indices.
         Result<List<Permissions>> GetPermissionsRange(Index start, Index end);
 
-        /// Fetches permissions at index.
+        /// Gets permissions at index.
         Result<Permissions> GetPermissions(Index index);
 
-        /// Fetches owner at index.
+        /// Gets owner at index.
         Result<Owner> GetOwner(Index index);
 
         /// Gets a complete list of owners from the entry in the permissions list at the specified
@@ -80,10 +83,56 @@ namespace SAFE.AppendOnlyDb.Network.AD
         public byte[] Value { get; set; }
     }
 
+    public struct IndexFromEnd : System.IComparable
+    {
+        public IndexFromEnd(ulong indexFromEnd, ulong count)
+        {
+            Value = indexFromEnd;
+            ulong index;
+            checked { index = count - indexFromEnd; }
+            AbsoluteIndex = new Index(index);
+        }
+
+        public ulong Value { get; }
+        public Index AbsoluteIndex { get; }
+
+        public int CompareTo(object obj)
+        {
+            if (obj is Index index)
+            {
+                if (index.Value > AbsoluteIndex.Value)
+                    return -1;
+                else if (AbsoluteIndex.Value == index.Value)
+                    return 0;
+                else if (AbsoluteIndex.Value > index.Value)
+                    return 1;
+                else
+                    throw new System.Exception();
+            }
+            else if (obj is IndexFromEnd indexFromEnd)
+            {
+                if (indexFromEnd.Value > Value)
+                    return 1;
+                else if (Value == indexFromEnd.Value)
+                    return 0;
+                else if (Value > indexFromEnd.Value)
+                    return -1;
+                else
+                    throw new System.Exception();
+            }
+            else
+                return -1;
+        }
+    }
+
     public struct Index : System.IComparable
     {
-        public static Index Zero => new Index { Value = 0 };
-        public ulong Value { get; set; }
+        public Index(ulong value)
+            => Value = value;
+
+        public static Index Zero => new Index(0);
+        public ulong Value { get; }
+        public Index Next => new Index(Value + 1);
 
         public int CompareTo(object obj)
         {
@@ -96,6 +145,33 @@ namespace SAFE.AppendOnlyDb.Network.AD
             else
                 throw new System.Exception();
         }
+
+        public static bool operator ==(Index s, Index e)
+            => e.Value == s.Value;
+        public static bool operator !=(Index s, Index e)
+            => s.Value != e.Value;
+
+        public static bool operator >(Index s, Index e)
+            => s.Value > e.Value;
+        public static bool operator <(Index s, Index e)
+            => e.Value > s.Value;
+
+        public static Index operator +(Index s, Index e)
+        {
+            checked
+            {
+                return new Index(e.Value + s.Value);
+            }
+        }
+
+        public static Index operator -(Index s, Index e)
+        {
+            checked
+            {
+                return new Index(e.Value - s.Value);
+            }
+        }
+
 
         public override bool Equals(object obj)
             => obj is Index index &&

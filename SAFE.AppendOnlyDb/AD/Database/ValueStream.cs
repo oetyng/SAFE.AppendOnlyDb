@@ -17,6 +17,9 @@ namespace SAFE.AppendOnlyDb.Network.AD
                 Value = value.GetBytes()
             };
 
+        internal static List<Entry> ToEntries(this List<StoredValue> values)
+            => values.Select(c => c.ToEntry()).ToList();
+
         internal static List<Entry> ToEntries(this StoredValue value)
             => new[] { value.ToEntry() }.ToList();
 
@@ -24,17 +27,21 @@ namespace SAFE.AppendOnlyDb.Network.AD
             => entry.Value.Parse<StoredValue>();
 
         internal static Index AsIndex(this ulong index)
-            => new Index { Value = index };
+            => new Index(index);
     }
 
     internal class ValueStream : IStreamAD_v2, IValueAD_v2
     {
         readonly ISeqAppendOnly _stream;
+        readonly Snapshotter_v2 _snapshotter;
 
         public Address Address => _stream.GetAddress();
 
-        public ValueStream(ISeqAppendOnly stream)
-            => _stream = stream;
+        public ValueStream(ISeqAppendOnly stream, Snapshotter_v2 snapshotter)
+        {
+            _stream = stream;
+            _snapshotter = snapshotter;
+        }
 
         #region ValueAD
 
@@ -61,16 +68,40 @@ namespace SAFE.AppendOnlyDb.Network.AD
         public Task<Result<Index>> AppendAsync(StoredValue value)
             => TryAppendAsync(value, ExpectedVersion.Any);
 
+        public Task<Result<Index>> AppendRangeAsync(List<StoredValue> values)
+           => TryAppendRangeAsync(values, ExpectedVersion.Any);
+
         public Task<Result<Index>> TryAppendAsync(StoredValue value, ExpectedVersion expectedVersion)
+            => TryAppendRangeAsync(new[] { value }.ToList(), expectedVersion);
+        
+        public Task<Result<Index>> TryAppendRangeAsync(List<StoredValue> values, ExpectedVersion expectedVersion)
         {
             return expectedVersion switch
             {
-                NoVersion _ => _stream.AppendAsync<Index>(value.ToEntries(), Index.Zero),
-                SpecificVersion some => _stream.AppendAsync<Index>(value.ToEntries(), some.Value.Value.AsIndex()),
-                AnyVersion _ => _stream.AppendAsync<Index>(value.ToEntries(), _stream.GetNextEntriesIndex()),
+                NoVersion _ => AppendAndTrySnapshotRangeAsync(values, Index.Zero),
+                SpecificVersion some => AppendAndTrySnapshotRangeAsync(values, some.Value.Value.AsIndex()),
+                AnyVersion _ => AppendAndTrySnapshotRangeAsync(values, _stream.GetNextEntriesIndex()),
                 _ => Task.FromResult((Result<Index>)new ArgumentOutOfRange<Index>()),
             };
         }
+
+        async Task<Result<Index>> AppendAndTrySnapshotRangeAsync(List<StoredValue> values, Index index)
+        {
+            if (CanSnapshot(index))
+            {
+                var pointer = await _snapshotter.StoreSnapshot(_stream);
+                if (!pointer.HasValue)
+                    return pointer.CastError<byte[], Index>();
+                var snapShotResult = await _stream.AppendAsync(new StoredValue(pointer.Value).ToEntries(), index);
+                if (!snapShotResult.HasValue)
+                    return snapShotResult;
+                index = snapShotResult.Value;
+            }
+            return await _stream.AppendAsync(values.ToEntries(), index);
+        }
+
+        bool CanSnapshot(Index index)
+            => _snapshotter != null && index.Value > 0 && index.Value % _snapshotter.Interval == 0;
 
         public IAsyncEnumerable<(Index, StoredValue)> GetAllIndexValuesAsync()
             => ReadForwardFromAsync(Index.Zero);
@@ -105,8 +136,30 @@ namespace SAFE.AppendOnlyDb.Network.AD
         IAsyncEnumerable<(Index, StoredValue)> Map(IEnumerable<(Index, Entry)> entries)
             => entries.Select(c => (c.Item1, c.Item2.ToStoredValue())).ToAsyncEnumerable();
 
-        public Task<Result<SnapshotReading>> ReadFromSnapshot()
-            => throw new NotImplementedException();
+        public async Task<Result<SnapshotReading>> ReadFromSnapshot()
+        {
+            var nextUnusedIndex = _stream.GetNextEntriesIndex();
+            if (_snapshotter.Interval + 1 > nextUnusedIndex.Value)
+                return new ArgumentOutOfRange<SnapshotReading>("No snapshot in the stream.");
+
+            var lastEntry = _stream.GetLastEntry();
+            var lastEntryIndex = new Index(nextUnusedIndex.Value - 1);
+            if (!lastEntry.HasValue)
+                return new DataNotFound<SnapshotReading>("No data in the stream.");
+
+            var reader = new SnapshotReader(_snapshotter.Interval);
+            var (previousSnapshotIndex, previousSnapshot) = await reader.GetPreviousAsync(nextUnusedIndex, _stream);
+
+            var reading = new SnapshotReading
+            {
+                SnapshotMap = previousSnapshot,
+                NewEvents = _stream.GetInRange(previousSnapshotIndex.Next, lastEntryIndex)
+                            .Value
+                            .Select(c => (c.Item1.Value, c.Item2.ToStoredValue()))
+                            .ToAsyncEnumerable()
+            };
+            return Result.OK(reading);
+        }
 
         #endregion StreamAD
     }

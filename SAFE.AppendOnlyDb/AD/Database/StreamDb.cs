@@ -10,10 +10,14 @@ namespace SAFE.AppendOnlyDb.AD.Database
     {
         Index _nextUnusedIndex;
         readonly ISeqAppendOnly _dbHistory;
+        readonly Snapshots.Snapshotter_v2 _snapshotter;
         readonly Dictionary<string, ISeqAppendOnly> _streams = new Dictionary<string, ISeqAppendOnly>();
 
-        public StreamDb_v2(ISeqAppendOnly dbHistory)
-            => _dbHistory = dbHistory;
+        public StreamDb_v2(ISeqAppendOnly dbHistory, Snapshots.Snapshotter_v2 snapshotter)
+        {
+            _dbHistory = dbHistory;
+            _snapshotter = snapshotter;
+        }
 
         public void Init()
         {
@@ -37,7 +41,7 @@ namespace SAFE.AppendOnlyDb.AD.Database
             };
 
             StreamDbEvent e = new StreamAdded(streamKey, address);
-            var result = await _dbHistory.AppendAsync<Index>(new StoredValue(e).ToEntries(), _nextUnusedIndex);
+            var result = await _dbHistory.AppendAsync(new StoredValue(e).ToEntries(), _nextUnusedIndex);
 
             if (result.HasValue)
             {
@@ -63,7 +67,7 @@ namespace SAFE.AppendOnlyDb.AD.Database
         public Task<Result<IStreamAD_v2>> GetStreamAsync(string streamKey)
         {
             if (_streams.ContainsKey(streamKey))
-                return Task.FromResult(Result.OK((IStreamAD_v2)new ValueStream(_streams[streamKey])));
+                return Task.FromResult(Result.OK((IStreamAD_v2)new ValueStream(_streams[streamKey], _snapshotter)));
             else
                 return Task.FromResult((Result<IStreamAD_v2>)new KeyNotFound<IStreamAD_v2>());
         }
@@ -71,7 +75,7 @@ namespace SAFE.AppendOnlyDb.AD.Database
         void Apply(StreamDbEvent e)
         {
             Apply((StreamAdded)e);
-            _nextUnusedIndex = new Index { Value = _nextUnusedIndex.Value + 1 };
+            _nextUnusedIndex = new Index(_nextUnusedIndex.Value + 1);
         }
 
         void Apply(StreamAdded e)

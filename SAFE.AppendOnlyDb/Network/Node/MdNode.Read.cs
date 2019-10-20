@@ -145,7 +145,7 @@ namespace SAFE.AppendOnlyDb.Network
                 case SpecificVersion sv:
                     var reading = new Snapshots.SnapshotReading
                     {
-                        SnapshotMap = lastNode.Snapshot,
+                        SnapshotPointer = lastNode.SnapshotPointer,
                         NewEvents = FindRangeAsync(lastNode.StartIndex, (ulong)sv.Value)
                             .OrderBy(c => c.Item1)
                     };

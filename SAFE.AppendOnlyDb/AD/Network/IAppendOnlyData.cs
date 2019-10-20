@@ -168,7 +168,7 @@ namespace SAFE.AppendOnlyDb.Network.AD
         {
             checked
             {
-                return new Index(e.Value - s.Value);
+                return new Index(s.Value - e.Value);
             }
         }
 

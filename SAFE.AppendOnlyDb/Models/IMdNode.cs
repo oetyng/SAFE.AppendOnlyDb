@@ -1,4 +1,5 @@
-﻿using SAFE.Data;
+﻿using SAFE.AppendOnlyDb.Snapshots;
+using SAFE.Data;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -6,7 +7,7 @@ namespace SAFE.AppendOnlyDb
 {
     internal interface IMdNode
     {
-        byte[] Snapshot { get; }
+        SnapshotPointer SnapshotPointer { get; }
 
         ulong StartIndex { get; }
         ulong EndIndex { get; }
@@ -33,7 +34,7 @@ namespace SAFE.AppendOnlyDb
         /// Reads the latest snapshot - if any - and all events since.
         /// </summary>
         /// <returns><see cref="SnapshotReading"/></returns>
-        Task<Result<Snapshots.SnapshotReading>> ReadFromSnapshot();
+        Task<Result<SnapshotReading>> ReadFromSnapshot();
 
         // ValueAD
         Task<Result<StoredValue>> GetLastVersionAsync(); // GetValueAsync

@@ -15,12 +15,33 @@ namespace SAFE.AppendOnlyDb.Snapshots
         /// The data map to an immutable data
         /// with the serialized Snapshot instance.
         /// </summary>
-        public byte[] SnapshotMap { get; set; }
+        public SnapshotPointer SnapshotPointer { get; set; }
         
         /// <summary>
         /// All new events since the snapshot was taken.
         /// </summary>
         public IAsyncEnumerable<(ulong, StoredValue)> NewEvents { get; set; }
+    }
+
+    /// <summary>
+    /// Stores a reference to an immutable data,
+    /// which will hold the actual snapshot.
+    /// </summary>
+    public class SnapshotPointer
+    {
+        [JsonConstructor]
+        SnapshotPointer() { }
+
+        public SnapshotPointer(byte[] pointer)
+            => Pointer = pointer;
+
+        /// <summary>
+        /// The pointer is a so-called
+        /// data map, which resolves to an
+        /// immutable data instance, when passed to
+        /// the GetImDAsync method of an IImdStore.
+        /// </summary>
+        public byte[] Pointer { get; set; }
     }
 
     public class Snapshot
@@ -48,13 +69,13 @@ namespace SAFE.AppendOnlyDb.Snapshots
 
     public abstract class Snapshotter
     {
-        internal abstract Task<Result<byte[]>> StoreSnapshot(IMdNode node);
+        internal abstract Task<Result<SnapshotPointer>> StoreSnapshot(IMdNode node);
     }
 
     class EmptySnapshotter : Snapshotter
     {
-        internal override Task<Result<byte[]>> StoreSnapshot(IMdNode node)
-            => Task.FromResult(Result.OK(new byte[0]));
+        internal override Task<Result<SnapshotPointer>> StoreSnapshot(IMdNode node)
+            => Task.FromResult(Result.OK(new SnapshotPointer(new byte[0])));
     }
 
     public class Snapshotter<T> : Snapshotter
@@ -78,10 +99,10 @@ namespace SAFE.AppendOnlyDb.Snapshots
         /// Stores a snapshot of all entries.
         /// </summary>
         /// <returns>Data map (pointer) to immutable data with serialized snapshot.</returns>
-        internal override async Task<Result<byte[]>> StoreSnapshot(IMdNode node)
+        internal override async Task<Result<SnapshotPointer>> StoreSnapshot(IMdNode node)
         {
             if (!node.IsFull) // we've settled for this invariant: only snapshotting full Mds
-                return new InvalidOperation<byte[]>("Cannot snapshot unless Md is full!");
+                return new InvalidOperation<SnapshotPointer>("Cannot snapshot unless Md is full!");
 
             var entries = node.FindRangeAsync(node.StartIndex, node.EndIndex);
             var ordered = entries
@@ -89,17 +110,17 @@ namespace SAFE.AppendOnlyDb.Snapshots
                 .Select(c => c.Item2.Parse<T>());
 
             Snapshot previous = default;
-            if (node.Snapshot != null)
-                previous = await GetSnapshotAsync(node.Snapshot);
+            if (node.SnapshotPointer != null)
+                previous = await GetSnapshotAsync(node.SnapshotPointer);
 
             var snapshot = await _leftFold(previous, ordered);
             var pointer = await _store.StoreImDAsync(snapshot.Serialize());
-            return Result.OK(pointer);
+            return Result.OK(new SnapshotPointer(pointer));
         }
 
-        public async Task<Snapshot> GetSnapshotAsync(byte[] pointer)
+        public async Task<Snapshot> GetSnapshotAsync(SnapshotPointer pointer)
         {
-            var bytes = await _store.GetImDAsync(pointer);
+            var bytes = await _store.GetImDAsync(pointer.Pointer);
             var snapshot = bytes.Parse<Snapshot>();
             return snapshot;
         }

@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using SAFE.AppendOnlyDb.Snapshots;
@@ -78,30 +77,30 @@ namespace SAFE.AppendOnlyDb.Network.AD
         {
             return expectedVersion switch
             {
-                NoVersion _ => AppendAndTrySnapshotRangeAsync(values, Index.Zero),
-                SpecificVersion some => AppendAndTrySnapshotRangeAsync(values, some.Value.Value.AsIndex()),
-                AnyVersion _ => AppendAndTrySnapshotRangeAsync(values, _stream.GetNextEntriesIndex()),
+                NoVersion _ => TrySnapshotAndAppendRangeAsync(values, Index.Zero),
+                SpecificVersion some => TrySnapshotAndAppendRangeAsync(values, some.Value.Value.AsIndex()),
+                AnyVersion _ => TrySnapshotAndAppendRangeAsync(values, _stream.GetNextEntriesIndex()),
                 _ => Task.FromResult((Result<Index>)new ArgumentOutOfRange<Index>()),
             };
         }
 
-        async Task<Result<Index>> AppendAndTrySnapshotRangeAsync(List<StoredValue> values, Index index)
+        async Task<Result<Index>> TrySnapshotAndAppendRangeAsync(List<StoredValue> values, Index index)
         {
             if (CanSnapshot(index))
             {
-                var pointer = await _snapshotter.StoreSnapshot(_stream);
-                if (!pointer.HasValue)
-                    return pointer.CastError<byte[], Index>();
-                var snapShotResult = await _stream.AppendAsync(new StoredValue(pointer.Value).ToEntries(), index);
-                if (!snapShotResult.HasValue)
-                    return snapShotResult;
-                index = snapShotResult.Value;
+                var snapshotPointer = await _snapshotter.StoreSnapshotAsync(_stream);
+                if (!snapshotPointer.HasValue)
+                    return snapshotPointer.CastError<SnapshotPointer, Index>();
+                var nextIndex = await _stream.AppendAsync(new StoredValue(snapshotPointer.Value).ToEntries(), index);
+                if (!nextIndex.HasValue)
+                    return nextIndex;
+                index = nextIndex.Value;
             }
             return await _stream.AppendAsync(values.ToEntries(), index);
         }
 
         bool CanSnapshot(Index index)
-            => _snapshotter != null && index.Value > 0 && index.Value % _snapshotter.Interval == 0;
+            => _snapshotter != null && _snapshotter.IsSnapshotIndex(index);
 
         public IAsyncEnumerable<(Index, StoredValue)> GetAllIndexValuesAsync()
             => ReadForwardFromAsync(Index.Zero);
@@ -136,30 +135,8 @@ namespace SAFE.AppendOnlyDb.Network.AD
         IAsyncEnumerable<(Index, StoredValue)> Map(IEnumerable<(Index, Entry)> entries)
             => entries.Select(c => (c.Item1, c.Item2.ToStoredValue())).ToAsyncEnumerable();
 
-        public async Task<Result<SnapshotReading>> ReadFromSnapshot()
-        {
-            var nextUnusedIndex = _stream.GetNextEntriesIndex();
-            if (_snapshotter.Interval + 1 > nextUnusedIndex.Value)
-                return new ArgumentOutOfRange<SnapshotReading>("No snapshot in the stream.");
-
-            var lastEntry = _stream.GetLastEntry();
-            var lastEntryIndex = new Index(nextUnusedIndex.Value - 1);
-            if (!lastEntry.HasValue)
-                return new DataNotFound<SnapshotReading>("No data in the stream.");
-
-            var reader = new SnapshotReader(_snapshotter.Interval);
-            var (previousSnapshotIndex, previousSnapshot) = await reader.GetPreviousAsync(nextUnusedIndex, _stream);
-
-            var reading = new SnapshotReading
-            {
-                SnapshotMap = previousSnapshot,
-                NewEvents = _stream.GetInRange(previousSnapshotIndex.Next, lastEntryIndex)
-                            .Value
-                            .Select(c => (c.Item1.Value, c.Item2.ToStoredValue()))
-                            .ToAsyncEnumerable()
-            };
-            return Result.OK(reading);
-        }
+        public Task<Result<SnapshotReading>> GetSnapshotReading()
+            => _snapshotter.GetSnapshotReading(_stream);
 
         #endregion StreamAD
     }

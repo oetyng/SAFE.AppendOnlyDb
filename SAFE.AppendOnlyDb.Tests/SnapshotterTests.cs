@@ -60,10 +60,10 @@ namespace SAFE.AppendOnlyDb.Tests
 
         async Task<T> GetCurrentState<T>(IStreamAD stream, Data.Client.IImDStore store)
         {
-            var snapshotReading = await stream.ReadFromSnapshot();
-            var snapshotData = await store.GetImDAsync(snapshotReading.Value.SnapshotMap);
+            var snapshotReading = (await stream.ReadFromSnapshot()).Value;
+            var snapshotData = await store.GetImDAsync(snapshotReading.SnapshotPointer.Pointer);
             var snapshot = snapshotData.Parse<Snapshot>();
-            var currentState = await SnapshotFunc(snapshot, snapshotReading.Value.NewEvents.Select(c => c.Item2.Parse<T>()));
+            var currentState = await SnapshotFunc(snapshot, snapshotReading.NewEvents.Select(c => c.Item2.Parse<T>()));
             return currentState.GetState<T>();
         }
 

@@ -18,7 +18,7 @@ namespace SAFE.AppendOnlyDb.Network.AD
         /// Reads the latest snapshot - if any - and all events since.
         /// </summary>
         /// <returns><see cref="SnapshotReading"/></returns>
-        Task<Result<Snapshots.SnapshotReading>> ReadFromSnapshot();
+        Task<Result<Snapshots.SnapshotReading>> GetSnapshotReading();
 
         IAsyncEnumerable<(Index, StoredValue)> ReadForwardFromAsync(Index from);
         IAsyncEnumerable<(Index, StoredValue)> ReadBackwardsFromAsync(Index from);

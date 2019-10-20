@@ -186,19 +186,19 @@ namespace SAFE.AppendOnlyDb.Network
             if (Level == 0)
                 return new ArgumentOutOfRange<Pointer>(nameof(Level));
 
-            byte[] snapshot = default;
+            SnapshotPointer snapshot = default;
             if (_snapshotter != null && previous != null)
             {
                 var snapshotResult = await _snapshotter.StoreSnapshot(previous);
                 if (!snapshotResult.HasValue)
-                    return snapshotResult.CastError<byte[], Pointer>();
+                    return snapshotResult.CastError<SnapshotPointer, Pointer>();
                 snapshot = snapshotResult.Value;
             }
 
             var meta = new MdMetadata
             {
                 Level = this.Level - 1,
-                Snapshot = snapshot,
+                Snapshot = snapshot.Pointer,
                 Previous = previous?.MdLocator,
                 StartIndex = previous?.EndIndex + 1 ?? 0
             };

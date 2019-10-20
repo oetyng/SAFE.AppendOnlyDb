@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SAFE.AppendOnlyDb.Snapshots;
+using System;
 using System.Threading.Tasks;
 
 namespace SAFE.AppendOnlyDb.Network
@@ -15,7 +16,9 @@ namespace SAFE.AppendOnlyDb.Network
         public int Count => _count;
         public bool IsFull => Count >= Capacity;
 
-        public byte[] Snapshot => _metadata.Snapshot;
+        public SnapshotPointer SnapshotPointer => _metadata.Snapshot == null ? 
+            null : 
+            new SnapshotPointer(_metadata.Snapshot);
 
         public ulong StartIndex => _metadata.StartIndex;
         public ulong EndIndex => StartIndex + (ulong)Math.Pow(Capacity, Level + 1) - 1;
@@ -29,7 +32,7 @@ namespace SAFE.AppendOnlyDb.Network
 
         public IMdNodeFactory NodeFactory => _dataOps.NodeFactory;
 
-        public MdNode(IMdDataOps dataOps, Snapshots.Snapshotter snapshotter)
+        public MdNode(IMdDataOps dataOps, Snapshotter snapshotter)
         {
             _dataOps = dataOps;
             _snapshotter = snapshotter;

@@ -2,17 +2,15 @@
 using SAFE.Data.Utils;
 using SafeApp.Utilities;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
-namespace SAFE.AppendOnlyDb.Network
+namespace SAFE.AppendOnlyDb.Network.InMem
 {
-    public class ImDStore_v2 : IImDStore_v2
+    public class InMemImDStore : IImDStore
     {
-        readonly INetworkDataOps_v2 _networkOps;
+        readonly INetworkDataOps _networkOps;
 
-        public ImDStore_v2(INetworkDataOps_v2 networkOps)
+        public InMemImDStore(INetworkDataOps networkOps)
             => _networkOps = networkOps;
 
         // While map size is too large for an MD entry
@@ -43,33 +41,4 @@ namespace SAFE.AppendOnlyDb.Network
             catch (ImmutableDataNotFound) { return map; }
         }
     }
-
-    public interface INetworkDataOps_v2
-    {
-        Task<byte []> GetImmutableData(byte[] map);
-        Task<byte[]> StoreImmutableData(byte[] payload);
-    }
-
-    public class NetworkDataOps_v2 : INetworkDataOps_v2
-    {
-        readonly List<(byte[], byte[])> _store = new List<(byte[], byte[])>();
-
-        public Task<byte[]> GetImmutableData(byte[] map)
-        {
-            var res = _store
-                .SingleOrDefault(c => Enumerable.SequenceEqual(c.Item1, map)).Item2;
-            if (res == null)
-                throw new ImmutableDataNotFound();
-            return Task.FromResult(res);
-        }
-
-        public Task<byte[]> StoreImmutableData(byte[] payload)
-        {
-            var map = payload.Reverse().ToArray();
-            _store.Add((map, payload));
-            return Task.FromResult(map);
-        }
-    }
-
-    public class ImmutableDataNotFound : Exception { }
 }

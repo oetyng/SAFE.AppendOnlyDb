@@ -5,15 +5,17 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SAFE.Data;
-using SAFE.AppendOnlyDb.Network.AD;
-using Index = SAFE.AppendOnlyDb.Network.AD.Index;
+using SAFE.AppendOnlyDb.Network;
+using Index = SAFE.AppendOnlyDb.Network.Index;
 using static SAFE.Data.Utils.EnumerableExt;
 
 namespace SAFE.AppendOnlyDb.Tests
 {
     [TestClass]
-    public class StreamADTests_v2 : TestBase_v2
+    public class StreamADTests : TestBase
     {
+        const ulong _snapshotLimit = 1000;
+
         [TestInitialize]
         public async Task TestInitialize() => await Init();
 
@@ -193,7 +195,7 @@ namespace SAFE.AppendOnlyDb.Tests
             // Arrange
             var stream = await _fixture.GetStreamADAsync();
 
-            var addCount = Math.Round(1.3 * Constants.MdCapacity);
+            var addCount = Math.Round(1.3 * _snapshotLimit);
             var sw = new Stopwatch();
 
             for (int i = 0; i < addCount; i++)
@@ -224,7 +226,7 @@ namespace SAFE.AppendOnlyDb.Tests
             // Arrange
             var stream = await _fixture.GetStreamADAsync();
 
-            var addCount = Math.Round(1.3 * Constants.MdCapacity);
+            var addCount = Math.Round(1.3 * _snapshotLimit);
             var sw = new Stopwatch();
 
             // Act

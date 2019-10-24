@@ -1,30 +1,31 @@
-﻿using SAFE.Data;
+﻿using SAFE.AppendOnlyDb.Snapshots;
+using SAFE.Data;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
-namespace SAFE.AppendOnlyDb
+namespace SAFE.AppendOnlyDb.Network
 {
-    public interface IStreamAD : IData
+    public interface IStreamAD
     {
-        Task<Result<Pointer>> AppendAsync(StoredValue value);
-        Task<Result<Pointer>> TryAppendAsync(StoredValue value, ExpectedVersion expectedVersion);
+        Task<Result<Index>> AppendAsync(StoredValue value);
+        Task<Result<Index>> TryAppendAsync(StoredValue value, ExpectedVersion expectedVersion);
 
-        // Todo: AppendRange / TryAppendRange
+        Task<Result<Index>> AppendRangeAsync(List<StoredValue> value);
+        Task<Result<Index>> TryAppendRangeAsync(List<StoredValue> value, ExpectedVersion expectedVersion);
 
-        Task<Result<StoredValue>> GetAtVersionAsync(ulong version);
+        Task<Result<StoredValue>> GetAtIndexAsync(Index version);
 
         /// <summary>
         /// Reads the latest snapshot - if any - and all events since.
         /// </summary>
         /// <returns><see cref="SnapshotReading"/></returns>
-        Task<Result<Snapshots.SnapshotReading>> ReadFromSnapshot();
+        Task<Result<SnapshotReading>> GetSnapshotReading();
 
-        IAsyncEnumerable<(ulong, StoredValue)> ReadForwardFromAsync(ulong from);
-        IAsyncEnumerable<(ulong, StoredValue)> ReadBackwardsFromAsync(ulong from);
-        IAsyncEnumerable<(ulong, StoredValue)> GetRangeAsync(ulong from, ulong to);
+        IAsyncEnumerable<(Index, StoredValue)> ReadForwardFromAsync(Index from);
+        IAsyncEnumerable<(Index, StoredValue)> ReadBackwardsFromAsync(Index from);
+        IAsyncEnumerable<(Index, StoredValue)> GetRangeAsync(Index from, Index to);
 
         IAsyncEnumerable<StoredValue> GetAllValuesAsync();
-        IAsyncEnumerable<(Pointer, StoredValue)> GetAllPointerValuesAsync();
+        IAsyncEnumerable<(Index, StoredValue)> GetAllIndexValuesAsync();
     }
 }

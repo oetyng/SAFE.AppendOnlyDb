@@ -1,121 +1,116 @@
-﻿using SAFE.AppendOnlyDb.Factories;
-using SAFE.Data;
-using System;
-using System.Collections.Concurrent;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using SAFE.AppendOnlyDb.Network;
+using SAFE.Data;
 
-namespace SAFE.AppendOnlyDb
+namespace SAFE.AppendOnlyDb.AD.Database
 {
     internal class StreamDb : IStreamDb
     {
-        readonly IStreamCollection _streams;
-        readonly Network.IMdNodeFactory _nodeFactory;
-        readonly DataTreeFactory _dataTreeFactory;
+        Index _nextUnusedIndex;
+        readonly ISeqAppendOnly _dbHistory;
+        readonly Snapshots.Snapshotter _snapshotter;
+        readonly Dictionary<string, ISeqAppendOnly> _streams = new Dictionary<string, ISeqAppendOnly>();
 
-        protected readonly ConcurrentDictionary<string, IStreamAD> _dataTreeCache = new ConcurrentDictionary<string, IStreamAD>();
-        protected ConcurrentDictionary<string, MdLocator> _dataTreeAddresses;
-
-        public StreamDb(IStreamCollection streams, Network.IMdNodeFactory nodeFactory)
-        { 
-            _streams = streams;
-            _nodeFactory = nodeFactory;
-            _dataTreeFactory = new DataTreeFactory(nodeFactory);
+        public StreamDb(ISeqAppendOnly dbHistory, Snapshots.Snapshotter snapshotter)
+        {
+            _dbHistory = dbHistory;
+            _snapshotter = snapshotter;
         }
 
-        public async Task<Result<IStreamAD>> GetOrAddStreamAsync(string streamKey)
+        public void Init()
         {
-            try
-            {
-                await InitDb();
-                if (!_dataTreeAddresses.ContainsKey(streamKey))
-                {
-                    await InitStreamAsync(streamKey).ConfigureAwait(false);
-                    await LoadStreamAsync(streamKey).ConfigureAwait(false);
-                }
-                if (!_dataTreeCache.ContainsKey(streamKey))
-                    await LoadStreamAsync(streamKey).ConfigureAwait(false);
-                return Result.OK(_dataTreeCache[streamKey]);
-            }
-            catch (Exception ex)
-            {
-                return Result.Fail<IStreamAD>(-999, ex.Message);
-            }
-        }
-
-        public async Task<Result<IStreamAD>> GetStreamAsync(string streamKey)
-        {
-            await InitDb();
-            if (!_dataTreeAddresses.ContainsKey(streamKey))
-                return new KeyNotFound<IStreamAD>(streamKey);
-            if (!_dataTreeCache.ContainsKey(streamKey))
-                await LoadStreamAsync(streamKey).ConfigureAwait(false);
-            return Result.OK(_dataTreeCache[streamKey]);
+            var history = _dbHistory
+                .GetEntries()
+                .Select(c => c.ToStoredValue())
+                .Select(c => c.Parse<StreamDbEvent>());
+            foreach (var e in history)
+                Apply(e);
         }
 
         public async Task<Result<bool>> AddStreamAsync(string streamKey)
         {
-            try
+            if (_streams.ContainsKey(streamKey))
+                return Result.OK(false);
+
+            var address = new Address
             {
-                await InitDb();
-                if (_dataTreeAddresses.ContainsKey(streamKey))
-                    return Result.OK(false);
+                Name = new XorName { Value = AddressUtil.GetHash(streamKey) },
+                Tag = 0,
+            };
 
-                await InitStreamAsync(streamKey).ConfigureAwait(false);
-                await LoadStreamAsync(streamKey).ConfigureAwait(false);
+            StreamDbEvent e = new StreamAdded(streamKey, address);
+            var result = await _dbHistory.AppendAsync(new StoredValue(e).ToEntries(), _nextUnusedIndex);
 
+            if (result.HasValue)
+            {
+                Apply(e);
                 return Result.OK(true);
             }
-            catch(Exception ex)
+            else
+                return result.CastError<Index, bool>();
+        }
+
+        public async Task<Result<IStreamAD>> GetOrAddStreamAsync(string streamKey)
+        {
+            if (!_streams.ContainsKey(streamKey))
             {
-                return Result.Fail<bool>(-999, ex.Message);
+                var res = await AddStreamAsync(streamKey);
+                if (!res.HasValue || !res.Value)
+                    return Result.Fail<IStreamAD>(-1, "");
             }
+
+            return await GetStreamAsync(streamKey);
         }
 
-        async Task InitStreamAsync(string type)
+        public Task<Result<IStreamAD>> GetStreamAsync(string streamKey)
         {
-            await InitDb();
-            if (_dataTreeAddresses.ContainsKey(type))
-                return;
-
-            Task OnHeadChange(MdLocator newLocation) => UpdateTypeStores(type, newLocation);
-
-            var dataTree = await _dataTreeFactory.CreateAsync(OnHeadChange).ConfigureAwait(false);
-            _dataTreeCache[type] = dataTree;
-            _dataTreeAddresses[type] = dataTree.MdLocator;
-            await _streams.AddAsync(type, dataTree.MdLocator).ConfigureAwait(false);
+            if (_streams.ContainsKey(streamKey))
+                return Task.FromResult(Result.OK((IStreamAD)new ValueStream(_streams[streamKey], _snapshotter)));
+            else
+                return Task.FromResult((Result<IStreamAD>)new KeyNotFound<IStreamAD>());
         }
 
-        async Task LoadStreamAsync(string type)
+        void Apply(StreamDbEvent e)
         {
-            await InitDb();
-            if (!_dataTreeAddresses.ContainsKey(type))
-                throw new InvalidOperationException($"Store does not exist! {type}");
-
-            Task OnHeadChange(MdLocator newXOR) => UpdateTypeStores(type, newXOR);
-            var headResult = await _nodeFactory.LocateAsync(_dataTreeAddresses[type]).ConfigureAwait(false);
-            if (!headResult.HasValue)
-                throw new Exception($"Error code: {headResult.ErrorCode.Value}. {headResult.ErrorMsg}");
-            var dataTree = new DataTree(headResult.Value, OnHeadChange);
-            _dataTreeCache[type] = dataTree;
+            Apply((StreamAdded)e);
+            _nextUnusedIndex = new Index(_nextUnusedIndex.Value + 1);
         }
 
-        async Task UpdateTypeStores(string type, MdLocator location)
+        void Apply(StreamAdded e)
         {
-            await InitDb();
-            await _streams.UpdateAsync(type, location).ConfigureAwait(false);
-            _dataTreeAddresses[type] = location;
+            var stream = new SeqAppendOnlyDataMock(e.Address);
+            _streams.Add(e.StreamName, stream);
         }
+    }
+    
+    class StreamDbEvent
+    {
 
-        async Task InitDb()
+    }
+
+    class StreamDbInitiated : StreamDbEvent
+    {
+        public StreamDbInitiated(string dbName, Address address)
         {
-            if (_dataTreeAddresses == null)
-            {
-                var streams = await _streams.GetAllAsync()
-                    .ToDictionaryAsync(c => c.Item1, c => c.Item2);
-
-                _dataTreeAddresses = new ConcurrentDictionary<string, MdLocator>(streams);
-            }
+            DbName = dbName;
+            Address = address;
         }
+
+        public string DbName { get; }
+        public Address Address { get; }
+    }
+
+    class StreamAdded : StreamDbEvent
+    {
+        public StreamAdded(string streamName, Address address)
+        {
+            StreamName = streamName;
+            Address = address;
+        }
+
+        public string StreamName { get; }
+        public Address Address { get; }
     }
 }

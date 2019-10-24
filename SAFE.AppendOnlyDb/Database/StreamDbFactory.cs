@@ -1,40 +1,36 @@
-﻿using System;
+﻿using System.Text;
 using System.Threading.Tasks;
 using SAFE.AppendOnlyDb.Network;
+using SAFE.AppendOnlyDb.Snapshots;
 using SAFE.Data;
 
-namespace SAFE.AppendOnlyDb.Factories
+namespace SAFE.AppendOnlyDb.AD.Database
 {
     public class StreamDbFactory
     {
-        readonly INetworkDataOps _dataOps;
-        readonly StreamCollectionFactory _streamCollectionFactory;
-        internal IMdNodeFactory NodeFactory { get; }
+        readonly INetworkDataOps _networkDataOps;
+        readonly Snapshotter _snapshotter;
 
-        public StreamDbFactory(INetworkDataOps dataOps, Snapshots.Snapshotter snapshotter)
+        public StreamDbFactory(INetworkDataOps networkDataOps, Snapshotter snapshotter)
         {
-            _dataOps = dataOps;
-            NodeFactory = new MdNodeFactory(dataOps, snapshotter);
-            _streamCollectionFactory = new StreamCollectionFactory(NodeFactory, new DataTreeFactory(NodeFactory));
+            _networkDataOps = networkDataOps;
+            _snapshotter = snapshotter;
         }
-
-        public async Task<Result<IStreamDb>> CreateForApp(string appId, string dbId, MdHeadPermissionSettings permissionSettings = null)
+        
+        public Task<Result<IStreamDb>> CreateForApp(string appId, string dbId)
         {
-            var manager = new MdHeadManager(_dataOps, NodeFactory, appId, DataProtocol.DEFAULT_AD_PROTOCOL, permissionSettings);
-            await manager.InitializeManager();
-            var streamDbHead = await manager.GetOrAddHeadAsync(dbId);
-            var dbResult = await GetOrAddAsync(streamDbHead);
-            return dbResult;
+            var db = new StreamDb(new SeqAppendOnlyDataMock(AddressUtil.GetAddress(dbId)), _snapshotter);
+            return Task.FromResult(Result.OK((IStreamDb)db));
         }
+    }
 
-        async Task<Result<IStreamDb>> GetOrAddAsync(MdHead streamDbHead)
-        {
-            var streamDbRoot = new DataTree(streamDbHead.Md, (s) => throw new ArgumentOutOfRangeException("Can only add 999 items to this collection."));
-            var streamCollection = await _streamCollectionFactory.GetOrAddCollectionAsync(streamDbRoot);
+    // Mock
+    internal class AddressUtil
+    {
+        public static Address GetAddress(string name)
+            => new Address { Name = new XorName { Value = GetHash(name) }, Tag = 0 };
 
-            var db = new StreamDb(streamCollection, NodeFactory);
-
-            return Result.OK((IStreamDb)db);
-        }
+        public static byte[] GetHash(string name)
+            => Encoding.UTF8.GetBytes(name);
     }
 }

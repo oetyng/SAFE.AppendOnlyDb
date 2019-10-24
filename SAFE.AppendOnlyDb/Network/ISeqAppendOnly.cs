@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace SAFE.AppendOnlyDb.Network.AD
+namespace SAFE.AppendOnlyDb.Network
 {
     // Common methods for published and unpublished unsequenced `AppendOnlyData`.
     interface ISeqAppendOnly : IAppendOnlyData

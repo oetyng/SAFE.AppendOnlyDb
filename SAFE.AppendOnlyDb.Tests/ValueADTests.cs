@@ -1,12 +1,12 @@
 ﻿using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SAFE.Data;
-using Index = SAFE.AppendOnlyDb.Network.AD.Index;
+using Index = SAFE.AppendOnlyDb.Network.Index;
 
 namespace SAFE.AppendOnlyDb.Tests
 {
     [TestClass]
-    public class ValueADTests_v2 : TestBase_v2
+    public class ValueADTests : TestBase
     {
         [TestInitialize]
         public async Task TestInitialize() => await Init();

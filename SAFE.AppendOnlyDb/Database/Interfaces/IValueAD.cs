@@ -1,12 +1,12 @@
 ﻿using SAFE.Data;
 using System.Threading.Tasks;
 
-namespace SAFE.AppendOnlyDb
+namespace SAFE.AppendOnlyDb.Network
 {
-    internal interface IValueAD : IData
+    internal interface IValueAD
     {
         Task<Result<StoredValue>> GetValueAsync();
-        Task<Result<Pointer>> SetAsync(StoredValue value);
-        Task<Result<Pointer>> TrySetAsync(StoredValue value, ExpectedVersion expectedVersion);
+        Task<Result<Index>> SetAsync(StoredValue value);
+        Task<Result<Index>> TrySetAsync(StoredValue value, ExpectedVersion expectedVersion);
     }
 }

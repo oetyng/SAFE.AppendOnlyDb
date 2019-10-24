@@ -1,13 +1,13 @@
 ﻿using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SAFE.AppendOnlyDb.AD.Database;
-using SAFE.AppendOnlyDb.Network.AD;
+using SAFE.AppendOnlyDb.Network;
 using SAFE.Data;
 
 namespace SAFE.AppendOnlyDb.Tests
 {
     [TestClass]
-    public class StreamDbTests_v2 : TestBase_v2
+    public class StreamDbTests : TestBase
     {
         [TestInitialize]
         public async Task TestInitialize() => await Init();
@@ -20,7 +20,7 @@ namespace SAFE.AppendOnlyDb.Tests
 
             // Assert
             Assert.IsNotNull(db);
-            Assert.IsInstanceOfType(db, typeof(StreamDb_v2));
+            Assert.IsInstanceOfType(db, typeof(StreamDb));
         }
 
         [TestMethod]
@@ -39,7 +39,7 @@ namespace SAFE.AppendOnlyDb.Tests
             Assert.IsTrue(result_1.HasValue);
 
             Assert.IsNotNull(result_2);
-            Assert.IsInstanceOfType(result_2, typeof(Result<IStreamAD_v2>));
+            Assert.IsInstanceOfType(result_2, typeof(Result<IStreamAD>));
             Assert.IsTrue(result_2.HasValue);
         }
 
@@ -59,7 +59,7 @@ namespace SAFE.AppendOnlyDb.Tests
             Assert.IsTrue(result_1.HasValue);
 
             Assert.IsNotNull(result_2);
-            Assert.IsInstanceOfType(result_2, typeof(Result<IStreamAD_v2>));
+            Assert.IsInstanceOfType(result_2, typeof(Result<IStreamAD>));
             Assert.IsTrue(result_2.HasValue);
         }
 
@@ -74,7 +74,7 @@ namespace SAFE.AppendOnlyDb.Tests
 
             // Assert
             Assert.IsNotNull(result_2);
-            Assert.IsInstanceOfType(result_2, typeof(Result<IStreamAD_v2>));
+            Assert.IsInstanceOfType(result_2, typeof(Result<IStreamAD>));
             Assert.IsTrue(result_2.HasValue);
         }
 
@@ -89,7 +89,7 @@ namespace SAFE.AppendOnlyDb.Tests
 
             // Assert
             Assert.IsNotNull(result);
-            Assert.IsInstanceOfType(result, typeof(KeyNotFound<IStreamAD_v2>));
+            Assert.IsInstanceOfType(result, typeof(KeyNotFound<IStreamAD>));
             Assert.IsFalse(result.HasValue);
         }
 

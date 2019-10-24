@@ -5,7 +5,7 @@ using SAFE.AppendOnlyDb.Snapshots;
 using SAFE.Data;
 using SAFE.Data.Utils;
 
-namespace SAFE.AppendOnlyDb.Network.AD
+namespace SAFE.AppendOnlyDb.Network
 {
     public static class DataHelper
     {
@@ -29,14 +29,14 @@ namespace SAFE.AppendOnlyDb.Network.AD
             => new Index(index);
     }
 
-    internal class ValueStream : IStreamAD_v2, IValueAD_v2
+    internal class ValueStream : IStreamAD, IValueAD
     {
         readonly ISeqAppendOnly _stream;
-        readonly Snapshotter_v2 _snapshotter;
+        readonly Snapshotter _snapshotter;
 
         public Address Address => _stream.GetAddress();
 
-        public ValueStream(ISeqAppendOnly stream, Snapshotter_v2 snapshotter)
+        public ValueStream(ISeqAppendOnly stream, Snapshotter snapshotter)
         {
             _stream = stream;
             _snapshotter = snapshotter;

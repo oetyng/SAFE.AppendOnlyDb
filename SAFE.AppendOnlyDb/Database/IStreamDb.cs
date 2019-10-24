@@ -1,4 +1,5 @@
-﻿using SAFE.Data;
+﻿using SAFE.AppendOnlyDb.Network;
+using SAFE.Data;
 using System.Threading.Tasks;
 
 namespace SAFE.AppendOnlyDb

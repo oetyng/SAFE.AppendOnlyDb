@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using SAFE.Data;
 using static SAFE.Data.Utils.EnumerableExt;
 
-namespace SAFE.AppendOnlyDb.Network.AD
+namespace SAFE.AppendOnlyDb.Network
 {
     class SeqAppendOnlyDataMock : ISeqAppendOnly
     {

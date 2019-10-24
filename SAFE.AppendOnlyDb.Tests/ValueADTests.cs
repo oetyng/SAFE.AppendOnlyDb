@@ -42,7 +42,7 @@ namespace SAFE.AppendOnlyDb.Tests
         }
 
         [TestMethod]
-        public async Task TrySetValueAsync_with_wrong_version_fails()
+        public async Task TrySetValueAsync_with_wrong_index_fails()
         {
             // Arrange
             var valueAD = await _fixture.GetValueADAsync();
@@ -50,11 +50,11 @@ namespace SAFE.AppendOnlyDb.Tests
             var firstValue = "firstValue";
             await valueAD.SetAsync(new StoredValue(firstValue));
 
-            var nextUnusedIndex = ExpectedVersion.None; // Wrong version, should be ExpectedVersion.Specific(0)
+            var expectedIndex = ExpectedIndex.Specific(0); // Wrong index, should be ExpectedIndex.Specific(1)
 
             // Act
             var lastValue = "lastValue";
-            var addResult = await valueAD.TrySetAsync(new StoredValue(lastValue), nextUnusedIndex);
+            var addResult = await valueAD.TrySetAsync(new StoredValue(lastValue), expectedIndex);
 
             // Assert
             Assert.IsNotNull(addResult);
@@ -63,7 +63,7 @@ namespace SAFE.AppendOnlyDb.Tests
         }
 
         [TestMethod]
-        public async Task TrySetValueAsync_with_correct_version_succeeds()
+        public async Task TrySetValueAsync_with_correct_index_succeeds()
         {
             // Arrange
             var valueAD = await _fixture.GetValueADAsync();
@@ -71,11 +71,11 @@ namespace SAFE.AppendOnlyDb.Tests
             var firstValue = "firstValue";
             await valueAD.SetAsync(new StoredValue(firstValue));
 
-            var nextUnusedIndex = ExpectedVersion.Specific(1);
+            var expectedIndex = ExpectedIndex.Specific(1);
 
             // Act
             var lastValue = "lastValue";
-            var addResult = await valueAD.TrySetAsync(new StoredValue(lastValue), nextUnusedIndex);
+            var addResult = await valueAD.TrySetAsync(new StoredValue(lastValue), expectedIndex);
 
             // Assert
             Assert.IsNotNull(addResult);

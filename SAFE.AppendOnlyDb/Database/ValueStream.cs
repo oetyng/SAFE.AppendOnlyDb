@@ -3,32 +3,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using SAFE.AppendOnlyDb.Snapshots;
 using SAFE.Data;
-using SAFE.Data.Utils;
 
 namespace SAFE.AppendOnlyDb.Network
 {
-    public static class DataHelper
-    {
-        internal static Entry ToEntry(this StoredValue value)
-            => new Entry
-            {
-                Key = new byte[0],
-                Value = value.GetBytes()
-            };
-
-        internal static List<Entry> ToEntries(this List<StoredValue> values)
-            => values.Select(c => c.ToEntry()).ToList();
-
-        internal static List<Entry> ToEntries(this StoredValue value)
-            => new[] { value.ToEntry() }.ToList();
-
-        internal static StoredValue ToStoredValue(this Entry entry)
-            => entry.Value.Parse<StoredValue>();
-
-        internal static Index AsIndex(this ulong index)
-            => new Index(index);
-    }
-
     internal class ValueStream : IStreamAD, IValueAD
     {
         readonly ISeqAppendOnly _stream;
@@ -54,10 +31,10 @@ namespace SAFE.AppendOnlyDb.Network
         }
 
         public Task<Result<Index>> SetAsync(StoredValue value)
-            => TryAppendAsync(value, ExpectedVersion.Any);
+            => TryAppendAsync(value, ExpectedIndex.Any);
 
-        public Task<Result<Index>> TrySetAsync(StoredValue value, ExpectedVersion expectedVersion)
-            => TryAppendAsync(value, expectedVersion);
+        public Task<Result<Index>> TrySetAsync(StoredValue value, ExpectedIndex expectedIndex)
+            => TryAppendAsync(value, expectedIndex);
 
         #endregion ValueAD
 
@@ -65,21 +42,20 @@ namespace SAFE.AppendOnlyDb.Network
         #region StreamAD
 
         public Task<Result<Index>> AppendAsync(StoredValue value)
-            => TryAppendAsync(value, ExpectedVersion.Any);
+            => TryAppendAsync(value, ExpectedIndex.Any);
 
         public Task<Result<Index>> AppendRangeAsync(List<StoredValue> values)
-           => TryAppendRangeAsync(values, ExpectedVersion.Any);
+           => TryAppendRangeAsync(values, ExpectedIndex.Any);
 
-        public Task<Result<Index>> TryAppendAsync(StoredValue value, ExpectedVersion expectedVersion)
-            => TryAppendRangeAsync(new[] { value }.ToList(), expectedVersion);
+        public Task<Result<Index>> TryAppendAsync(StoredValue value, ExpectedIndex expectedIndex)
+            => TryAppendRangeAsync(new[] { value }.ToList(), expectedIndex);
         
-        public Task<Result<Index>> TryAppendRangeAsync(List<StoredValue> values, ExpectedVersion expectedVersion)
+        public Task<Result<Index>> TryAppendRangeAsync(List<StoredValue> values, ExpectedIndex expectedIndex)
         {
-            return expectedVersion switch
+            return expectedIndex switch
             {
-                NoVersion _ => TrySnapshotAndAppendRangeAsync(values, Index.Zero),
-                SpecificVersion some => TrySnapshotAndAppendRangeAsync(values, some.Value.Value.AsIndex()),
-                AnyVersion _ => TrySnapshotAndAppendRangeAsync(values, _stream.GetNextEntriesIndex()),
+                SpecificIndex some => TrySnapshotAndAppendRangeAsync(values, some.Value.Value.AsIndex()),
+                AnyIndex _ => TrySnapshotAndAppendRangeAsync(values, _stream.GetNextEntriesIndex()),
                 _ => Task.FromResult((Result<Index>)new ArgumentOutOfRange<Index>()),
             };
         }
@@ -110,20 +86,20 @@ namespace SAFE.AppendOnlyDb.Network
 
         public Task<Result<StoredValue>> GetAtIndexAsync(Index index)
         {
-            var result = _stream.GetInRange(index, index);
+            var result = _stream.GetEntriesRange(index, index);
             if (result.HasValue)
                 return Task.FromResult(Result.OK(result.Value.First().Item2.ToStoredValue()));
             else return Task.FromResult(result.CastError<List<(Index, Entry)>, StoredValue>());
         }
 
         public IAsyncEnumerable<(Index, StoredValue)> GetRangeAsync(Index from, Index to)
-            => Map(_stream.GetInRange(from, to));
+            => Map(_stream.GetEntriesRange(from, to));
 
         public IAsyncEnumerable<(Index, StoredValue)> ReadBackwardsFromAsync(Index from)
-            => Map(_stream.GetInRange(from, 0UL.AsIndex()));
+            => Map(_stream.GetEntriesRange(from, 0UL.AsIndex()));
 
         public IAsyncEnumerable<(Index, StoredValue)> ReadForwardFromAsync(Index from)
-            => Map(_stream.GetInRange(from, _stream.GetNextEntriesIndex()));
+            => Map(_stream.GetEntriesRange(from, _stream.GetNextEntriesIndex()));
 
         IAsyncEnumerable<(Index, StoredValue)> Map(Result<List<(Index, Entry)>> result)
         {

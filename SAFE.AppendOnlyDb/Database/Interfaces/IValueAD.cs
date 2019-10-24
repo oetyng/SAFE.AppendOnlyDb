@@ -7,6 +7,6 @@ namespace SAFE.AppendOnlyDb.Network
     {
         Task<Result<StoredValue>> GetValueAsync();
         Task<Result<Index>> SetAsync(StoredValue value);
-        Task<Result<Index>> TrySetAsync(StoredValue value, ExpectedVersion expectedVersion);
+        Task<Result<Index>> TrySetAsync(StoredValue value, ExpectedIndex expectedIndex);
     }
 }

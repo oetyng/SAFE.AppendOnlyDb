@@ -67,7 +67,7 @@ namespace SAFE.AppendOnlyDb.Tests
         }
 
         [TestMethod]
-        public async Task TryAppendAsync_with_wrong_version_fails()
+        public async Task TryAppendAsync_with_wrong_index_fails()
         {
             // Arrange
             var stream = await _fixture.GetStreamADAsync();
@@ -75,11 +75,11 @@ namespace SAFE.AppendOnlyDb.Tests
             var firstValue = "firstValue";
             await stream.AppendAsync(new StoredValue(firstValue));
 
-            var nextUnusedIndex = ExpectedVersion.None; // Wrong version, should be ExpectedVersion.Specific(0)
+            var expectedIndex = ExpectedIndex.Specific(0); // Wrong index, should be ExpectedIndex.Specific(1)
 
             // Act
             var lastValue = "lastValue";
-            var addResult = await stream.TryAppendAsync(new StoredValue(lastValue), nextUnusedIndex);
+            var addResult = await stream.TryAppendAsync(new StoredValue(lastValue), expectedIndex);
 
             // Assert
             Assert.IsNotNull(addResult);
@@ -88,7 +88,7 @@ namespace SAFE.AppendOnlyDb.Tests
         }
 
         [TestMethod]
-        public async Task TryAppendAsync_with_correct_version_succeeds()
+        public async Task TryAppendAsync_with_correct_index_succeeds()
         {
             // Arrange
             var stream = await _fixture.GetStreamADAsync();
@@ -96,11 +96,11 @@ namespace SAFE.AppendOnlyDb.Tests
             var firstValue = "firstValue";
             await stream.AppendAsync(new StoredValue(firstValue));
 
-            var nextUnusedIndex = ExpectedVersion.Specific(1);
+            var expectedIndex = ExpectedIndex.Specific(1);
 
             // Act
             var lastValue = "lastValue";
-            var addResult = await stream.TryAppendAsync(new StoredValue(lastValue), nextUnusedIndex);
+            var addResult = await stream.TryAppendAsync(new StoredValue(lastValue), expectedIndex);
 
             // Assert
             Assert.IsNotNull(addResult);
@@ -138,7 +138,7 @@ namespace SAFE.AppendOnlyDb.Tests
         }
 
         [TestMethod]
-        public async Task GetAtVersionAsync_returns_correct_value()
+        public async Task GetAtIndexAsync_returns_correct_value()
         {
             // Arrange
             var stream = await _fixture.GetStreamADAsync();
@@ -146,14 +146,14 @@ namespace SAFE.AppendOnlyDb.Tests
             var firstValue = "firstValue";
             var middleValue = "middleValue"; // <= Expected value
             var lastValue = "lastValue";
-            await stream.AppendAsync(new StoredValue(firstValue)); // version 0
-            await stream.AppendAsync(new StoredValue(middleValue)); // version 1 <= Pick this one
-            await stream.AppendAsync(new StoredValue(lastValue)); // version 2
+            await stream.AppendAsync(new StoredValue(firstValue)); // index 0
+            await stream.AppendAsync(new StoredValue(middleValue)); // index 1 <= Pick this one
+            await stream.AppendAsync(new StoredValue(lastValue)); // index 2
 
-            var middleVersion = ExpectedVersion.Specific(1);
+            var middleIndex = ExpectedIndex.Specific(1);
 
             // Act
-            var result = await stream.GetAtIndexAsync(middleVersion.Value.Value.AsIndex());
+            var result = await stream.GetAtIndexAsync(middleIndex.Value.Value.AsIndex());
 
             // Assert 2
             Assert.IsNotNull(result);
@@ -237,9 +237,9 @@ namespace SAFE.AppendOnlyDb.Tests
             var forwardEvents = await stream.ReadForwardFromAsync(Index.Zero).ToListAsync();
             Assert.IsNotNull(forwardEvents);
             Assert.AreEqual(addCount, forwardEvents.Count);
-            var fwdVersions = forwardEvents.Select(c => c.Item1.Value);
+            var fwdIndices = forwardEvents.Select(c => c.Item1.Value);
             var fwdValues = forwardEvents.Select(c => c.Item2.Parse<int>());
-            Assert.IsTrue(Enumerable.SequenceEqual(fwdVersions, LongRange(0, (ulong)addCount)));
+            Assert.IsTrue(Enumerable.SequenceEqual(fwdIndices, LongRange(0, (ulong)addCount)));
             Assert.IsTrue(Enumerable.SequenceEqual(fwdValues, Enumerable.Range(0, (int)addCount)));
 
             // Assert 2: Backwards
@@ -247,14 +247,14 @@ namespace SAFE.AppendOnlyDb.Tests
             Assert.IsNotNull(backwardEvents);
             Assert.AreEqual(addCount, backwardEvents.Count);
 
-            var bwdVersions = backwardEvents.Select(c => c.Item1.Value).ToList();
+            var bwdIndices = backwardEvents.Select(c => c.Item1.Value).ToList();
             var bwdValues = backwardEvents.Select(c => c.Item2.Parse<int>()).ToList();
             var reverseInt32AddRange = Enumerable.Range(0, (int)addCount).Reverse().ToList(); // <- Reverse
             var reverseUInt64AddRange = reverseInt32AddRange.Select(c => (ulong)c).ToList();
 
             Assert.AreEqual(reverseInt32AddRange.Count, reverseUInt64AddRange.Count);
             Assert.IsTrue(Enumerable.SequenceEqual(bwdValues, reverseInt32AddRange));
-            Assert.IsTrue(Enumerable.SequenceEqual(bwdVersions, reverseUInt64AddRange));
+            Assert.IsTrue(Enumerable.SequenceEqual(bwdIndices, reverseUInt64AddRange));
         }
     }
 }

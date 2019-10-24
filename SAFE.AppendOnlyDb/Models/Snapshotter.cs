@@ -66,7 +66,7 @@ namespace SAFE.AppendOnlyDb.Snapshots
             var reading = new SnapshotReading
             {
                 SnapshotPointer = previousSnapshot,
-                NewEvents = stream.GetInRange(indexOfPreviousSnapshot.Next, nextUnusedIndex)
+                NewEvents = stream.GetEntriesRange(indexOfPreviousSnapshot.Next, nextUnusedIndex)
                             .Value
                             .Select(c => (c.Item1.Value, c.Item2.ToStoredValue()))
                             .ToAsyncEnumerable()
@@ -141,7 +141,7 @@ namespace SAFE.AppendOnlyDb.Snapshots
             var startIndex = nextUnusedIndex.Value == Interval ?
                 Index.Zero :
                 TryGetPreviousIndex(nextUnusedIndex).Value + new Index(1);
-            var entries = stream.GetInRange(startIndex, nextUnusedIndex);
+            var entries = stream.GetEntriesRange(startIndex, nextUnusedIndex);
             if (!entries.HasValue)
                 return entries.CastError<List<(Index, Entry)>, IAsyncEnumerable<T>>();
 

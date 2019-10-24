@@ -8,12 +8,12 @@ namespace SAFE.AppendOnlyDb.Network
     public interface IStreamAD
     {
         Task<Result<Index>> AppendAsync(StoredValue value);
-        Task<Result<Index>> TryAppendAsync(StoredValue value, ExpectedVersion expectedVersion);
+        Task<Result<Index>> TryAppendAsync(StoredValue value, ExpectedIndex expectedIndex);
 
         Task<Result<Index>> AppendRangeAsync(List<StoredValue> value);
-        Task<Result<Index>> TryAppendRangeAsync(List<StoredValue> value, ExpectedVersion expectedVersion);
+        Task<Result<Index>> TryAppendRangeAsync(List<StoredValue> value, ExpectedIndex expectedIndex);
 
-        Task<Result<StoredValue>> GetAtIndexAsync(Index version);
+        Task<Result<StoredValue>> GetAtIndexAsync(Index index);
 
         /// <summary>
         /// Reads the latest snapshot - if any - and all events since.

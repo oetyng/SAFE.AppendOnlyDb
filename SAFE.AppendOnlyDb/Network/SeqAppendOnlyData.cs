@@ -57,7 +57,7 @@ namespace SAFE.AppendOnlyDb.Network
 
         public Index GetNextEntriesIndex() => ((ulong)_entries.Count).AsIndex();
 
-        public Result<List<(Index, Entry)>> GetInRange(Index start, Index end)
+        public Result<List<(Index, Entry)>> GetEntriesRange(Index start, Index end)
         {
             var backwards = start.Value > end.Value;
             var from = start.Value < end.Value ? start.Value : end.Value;

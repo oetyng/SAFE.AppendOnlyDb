@@ -1,7 +1,6 @@
 ﻿using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SAFE.Data;
-using Index = SAFE.AppendOnlyDb.Network.Index;
 
 namespace SAFE.AppendOnlyDb.Tests
 {

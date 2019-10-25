@@ -7,42 +7,41 @@ using SAFE.AppendOnlyDb.Network;
 using SAFE.AppendOnlyDb.Snapshots;
 using SAFE.Data;
 using SAFE.Data.Utils;
-using Index = SAFE.AppendOnlyDb.Network.Index;
 
 namespace SAFE.AppendOnlyDb.Tests
 {
     [TestClass]
     public class SnapshotterTests : TestBase
     {
-
         const int Interval = 1000;
 
         [TestInitialize]
         public async Task TestInitialize()
         {
-            await Init((store) => new Snapshotter<ulong>(1000, store, SnapshotFunc));
+            await Init((store) => new Snapshotter<ulong>(Interval, store, SnapshotFunc));
         }
 
         [TestMethod]
-        public void IsSnapshotIndex()
+        public void IsSnapshotIndexWorksUpTo1mEntries()
         {
-            Assert.IsTrue(IsSnapshotIndex(1000));
-            Assert.IsTrue(IsSnapshotIndex(2001));
-            Assert.IsTrue(IsSnapshotIndex(3002));
-            Assert.IsTrue(IsSnapshotIndex(4003));
-            Assert.IsTrue(IsSnapshotIndex(5004));
-            Assert.IsTrue(IsSnapshotIndex(6005));
-            Assert.IsTrue(IsSnapshotIndex(7006));
-            Assert.IsTrue(IsSnapshotIndex(8007));
+            for (int i = 0; i < 1000; i++)
+                Assert.IsTrue(IsSnapshotIndex((i + 1)*Interval + i));
+        }
+
+        [TestMethod]
+        public void IsSnapshotIndexDoesntWorkOver1mEntries()
+        {
+            var multiplier = 1001;
+            Assert.IsFalse(IsSnapshotIndex((multiplier + 1) * Interval + multiplier));
         }
 
         bool IsSnapshotIndex(int index)
         {
             if (index == Interval) return true;
-            var hum = index / Interval;
+            var count = index / Interval;
             var rest = index % Interval;
-            if (hum - rest == 1) return true;
-            return false;
+            if (count - rest == 1) return true;
+            else return false;
         }
 
         // overflow once (1099 entries > 1000), as to produce 1 snapshot

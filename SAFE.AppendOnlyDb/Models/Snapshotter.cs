@@ -59,14 +59,14 @@ namespace SAFE.AppendOnlyDb.Snapshots
             if (!validation.HasValue)
                 return validation.CastError<Index, SnapshotReading>();
             
-            var nextUnusedIndex = validation.Value;
-            var lastEntryIndex = new Index(nextUnusedIndex.Value - 1);
-            var (indexOfPreviousSnapshot, previousSnapshot) = await TryGetPointerToPreviousAsync(stream, nextUnusedIndex);
+            var expectedIndex = validation.Value;
+            var lastEntryIndex = new Index(expectedIndex.Value - 1);
+            var (indexOfPreviousSnapshot, previousSnapshot) = await TryGetPointerToPreviousAsync(stream, expectedIndex);
 
             var reading = new SnapshotReading
             {
                 SnapshotPointer = previousSnapshot,
-                NewEvents = stream.GetEntriesRange(indexOfPreviousSnapshot.Next, nextUnusedIndex)
+                NewEvents = stream.GetEntriesRange(indexOfPreviousSnapshot.Next, expectedIndex)
                             .Value
                             .Select(c => (c.Item1.Value, c.Item2.ToStoredValue()))
                             .ToAsyncEnumerable()
@@ -74,10 +74,10 @@ namespace SAFE.AppendOnlyDb.Snapshots
             return Result.OK(reading);
         }
 
-        // can be called for any index, even when nextUnusedIndex is NOT SnapshotIndex
-        Task<(Index, SnapshotPointer)> TryGetPointerToPreviousAsync(ISeqAppendOnly stream, Index nextUnusedIndex)
+        // can be called for any index, even when expectedIndex is NOT SnapshotIndex
+        Task<(Index, SnapshotPointer)> TryGetPointerToPreviousAsync(ISeqAppendOnly stream, Index expectedIndex)
         {
-            var previousSnapshotIndex = TryGetPreviousIndex(nextUnusedIndex);
+            var previousSnapshotIndex = TryGetPreviousIndex(expectedIndex);
             if (!previousSnapshotIndex.HasValue)
                 return Task.FromResult((default(Index), default(SnapshotPointer)));
 
@@ -91,40 +91,40 @@ namespace SAFE.AppendOnlyDb.Snapshots
             return Task.FromResult((previousSnapshotIndex.Value, previousSnapshot));
         }
 
-        Result<Index> TryGetPreviousIndex(Index nextUnusedIndex)
+        Result<Index> TryGetPreviousIndex(Index expectedIndex)
         {
-            if (nextUnusedIndex.Value < (Interval + 1))
+            if (expectedIndex.Value < (Interval + 1))
                 return new ArgumentOutOfRange<Index>();
 
             var unit = new Index(1);
-            while (!IsSnapshotIndex(nextUnusedIndex - unit)) // todo: optimize
-                nextUnusedIndex -= unit;
-            return Result.OK(nextUnusedIndex - unit);
+            while (!IsSnapshotIndex(expectedIndex - unit)) // todo: optimize
+                expectedIndex -= unit;
+            return Result.OK(expectedIndex - unit);
         }
 
         // todo: improve this, currently has bad naming and iffy logic
         async Task<Result<Index>> ValidateRequestAsync(ISeqAppendOnly stream)
         {
-            var nextUnusedIndex = stream.GetNextEntriesIndex();
-            if (Interval + 1 > nextUnusedIndex.Value)
+            var expectedIndex = stream.GetExpectedEntriesIndex();
+            if (Interval + 1 > expectedIndex.Value)
                 return new ArgumentOutOfRange<Index>("No snapshot in the stream.");
 
             var lastEntry = stream.GetLastEntry();
             if (!lastEntry.HasValue)
                 return new DataNotFound<Index>("No data in the stream.");
 
-            return Result.OK(nextUnusedIndex);
+            return Result.OK(expectedIndex);
         }
 
-        // is only called when nextUnusedIndex IsSnapshotIndex
+        // is only called when IsSnapshotIndex(expectedIndex) == true
         async Task<Result<SnapshotSourceData>> GetSourceDataAsync(ISeqAppendOnly stream)
         {
-            var nextUnusedIndex = stream.GetNextEntriesIndex();
-            if (!IsSnapshotIndex(nextUnusedIndex))
+            var expectedIndex = stream.GetExpectedEntriesIndex();
+            if (!IsSnapshotIndex(expectedIndex))
                 return new ArgumentOutOfRange<SnapshotSourceData>();
 
-            var (_, pointerToPrevious) = await TryGetPointerToPreviousAsync(stream, nextUnusedIndex);
-            var newEvents = await GetNewEventsAsync(stream, nextUnusedIndex);
+            var (_, pointerToPrevious) = await TryGetPointerToPreviousAsync(stream, expectedIndex);
+            var newEvents = await GetNewEventsAsync(stream, expectedIndex);
             if (!newEvents.HasValue)
                 return newEvents.CastError<IAsyncEnumerable<T>, SnapshotSourceData>();
 
@@ -135,13 +135,13 @@ namespace SAFE.AppendOnlyDb.Snapshots
             return Result.OK(new SnapshotSourceData(previousSnapshot, newEvents.Value));
         }
 
-        async Task<Result<IAsyncEnumerable<T>>> GetNewEventsAsync(ISeqAppendOnly stream, Index nextUnusedIndex)
+        async Task<Result<IAsyncEnumerable<T>>> GetNewEventsAsync(ISeqAppendOnly stream, Index expectedIndex)
         {
             // todo: fix this, with improper value of index passed in, it would crash
-            var startIndex = nextUnusedIndex.Value == Interval ?
+            var startIndex = expectedIndex.Value == Interval ?
                 Index.Zero :
-                TryGetPreviousIndex(nextUnusedIndex).Value + new Index(1);
-            var entries = stream.GetEntriesRange(startIndex, nextUnusedIndex);
+                TryGetPreviousIndex(expectedIndex).Value.Next;
+            var entries = stream.GetEntriesRange(startIndex, expectedIndex);
             if (!entries.HasValue)
                 return entries.CastError<List<(Index, Entry)>, IAsyncEnumerable<T>>();
 

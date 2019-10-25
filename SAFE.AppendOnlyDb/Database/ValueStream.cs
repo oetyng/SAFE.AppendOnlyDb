@@ -55,7 +55,7 @@ namespace SAFE.AppendOnlyDb.Network
             return expectedIndex switch
             {
                 SpecificIndex some => TrySnapshotAndAppendRangeAsync(values, some.Value.Value.AsIndex()),
-                AnyIndex _ => TrySnapshotAndAppendRangeAsync(values, _stream.GetNextEntriesIndex()),
+                AnyIndex _ => TrySnapshotAndAppendRangeAsync(values, _stream.GetExpectedEntriesIndex()),
                 _ => Task.FromResult((Result<Index>)new ArgumentOutOfRange<Index>()),
             };
         }
@@ -67,12 +67,12 @@ namespace SAFE.AppendOnlyDb.Network
                 var snapshotPointer = await _snapshotter.StoreSnapshotAsync(_stream);
                 if (!snapshotPointer.HasValue)
                     return snapshotPointer.CastError<SnapshotPointer, Index>();
-                var nextIndex = await _stream.AppendAsync(new StoredValue(snapshotPointer.Value).ToEntries(), index);
+                var nextIndex = await _stream.AppendRangeAsync(new StoredValue(snapshotPointer.Value).ToEntries(), index);
                 if (!nextIndex.HasValue)
                     return nextIndex;
                 index = nextIndex.Value;
             }
-            return await _stream.AppendAsync(values.ToEntries(), index);
+            return await _stream.AppendRangeAsync(values.ToEntries(), index);
         }
 
         bool CanSnapshot(Index index)
@@ -99,7 +99,7 @@ namespace SAFE.AppendOnlyDb.Network
             => Map(_stream.GetEntriesRange(from, 0UL.AsIndex()));
 
         public IAsyncEnumerable<(Index, StoredValue)> ReadForwardFromAsync(Index from)
-            => Map(_stream.GetEntriesRange(from, _stream.GetNextEntriesIndex()));
+            => Map(_stream.GetEntriesRange(from, _stream.GetExpectedEntriesIndex()));
 
         IAsyncEnumerable<(Index, StoredValue)> Map(Result<List<(Index, Entry)>> result)
         {

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace SAFE.AppendOnlyDb.Network
 {
     // Common methods for published and unpublished unsequenced `AppendOnlyData`.
-    interface IUnseqAppendOnly : IAppendOnlyData
+    interface IUnseqAppendOnly : IAppendOnly
     {
         /// Appends new entries.
         /// Returns an error if duplicate entries are present.

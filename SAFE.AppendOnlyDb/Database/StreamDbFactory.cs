@@ -19,7 +19,7 @@ namespace SAFE.AppendOnlyDb.AD.Database
         
         public Task<Result<IStreamDb>> CreateForApp(string appId, string dbId)
         {
-            var db = new StreamDb(new SeqAppendOnlyDataMock(AddressUtil.GetAddress(dbId)), _snapshotter);
+            var db = new StreamDb(new InMemSeqAppendOnly(AddressUtil.GetAddress(dbId)), _snapshotter);
             return Task.FromResult(Result.OK((IStreamDb)db));
         }
     }

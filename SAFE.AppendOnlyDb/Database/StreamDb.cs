@@ -8,7 +8,7 @@ namespace SAFE.AppendOnlyDb.AD.Database
 {
     internal class StreamDb : IStreamDb
     {
-        Index _nextUnusedIndex;
+        Index _expectedIndex;
         readonly ISeqAppendOnly _dbHistory;
         readonly Snapshots.Snapshotter _snapshotter;
         readonly Dictionary<string, ISeqAppendOnly> _streams = new Dictionary<string, ISeqAppendOnly>();
@@ -41,7 +41,7 @@ namespace SAFE.AppendOnlyDb.AD.Database
             };
 
             StreamDbEvent e = new StreamAdded(streamKey, address);
-            var result = await _dbHistory.AppendAsync(new StoredValue(e).ToEntries(), _nextUnusedIndex);
+            var result = await _dbHistory.AppendRangeAsync(new StoredValue(e).ToEntries(), _expectedIndex);
 
             if (result.HasValue)
             {
@@ -75,12 +75,12 @@ namespace SAFE.AppendOnlyDb.AD.Database
         void Apply(StreamDbEvent e)
         {
             Apply((StreamAdded)e);
-            _nextUnusedIndex = new Index(_nextUnusedIndex.Value + 1);
+            _expectedIndex = _expectedIndex.Next;
         }
 
         void Apply(StreamAdded e)
         {
-            var stream = new SeqAppendOnlyDataMock(e.Address);
+            var stream = new InMemSeqAppendOnly(e.Address);
             _streams.Add(e.StreamName, stream);
         }
     }

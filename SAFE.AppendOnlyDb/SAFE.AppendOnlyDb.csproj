@@ -17,7 +17,7 @@
 
   <ItemGroup>
     <PackageReference Include="MaidSafe.SafeApp" Version="0.2.1" />
-    <PackageReference Include="Newtonsoft.Json" Version="12.0.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
     <PackageReference Include="SAFE.Data.Common" Version="0.2.0" />
     <PackageReference Include="System.Interactive.Async" Version="4.0.0" />
   </ItemGroup>
